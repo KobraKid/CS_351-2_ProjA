@@ -1,7 +1,15 @@
+/**
+ * GUI Manager.
+ *
+ * Handles setting up the GUI and handling interactions with it.
+ *
+ * @author Michael Huyler
+ */
+
 var gui;
 var gui_open = true;
 var GuiTracker = function() {
-  this.test_var = 0;
+  // this.test_var = 0;
 }
 var tracker = new GuiTracker();
 var help_visible = false;
@@ -11,8 +19,8 @@ function initGui() {
     name: 'My GUI',
     hideable: false
   });
-  gui.add(tracker, 'test_var').name('Test Variable');
-  if (!gui_open)
+  // gui.add(tracker, 'test_var').name('Test Variable');
+  if (gui_open)
     gui.close();
   document.getElementsByClassName('close-bottom')[0].onclick = function() {
     gui_open = !gui_open;
@@ -32,5 +40,3 @@ function toggle_help() {
   document.getElementById("help-menu-expanded").style.visibility = help_visible ? "visible" : "hidden";
   document.getElementById("help-menu").innerHTML = help_visible ? "Hide Help" : "Show Help";
 }
-
-initGui();
