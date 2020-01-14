@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="utf-8">
+  <title>Michael Huyler 351-2 Project A</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body onload="main()" onresize="drawResize()">
+  <!-- Content -->
+  <div class="content">
+    <canvas id="webgl">This page requires a browser that supports the HTML5 canvas element.</canvas>
+  </div>
+  <div id="help-menu" onclick="toggle_help()">Show Help</div>
+  <div id="help-menu-expanded">
+    Menus
+    <ul>
+      <li>Press <code>/</code> to toggle this menu</li>
+      <li>Press <code>.</code> to toggle the GUI</li>
+      <li>Use the GUI to make changes to the scene</li>
+    </ul>
+    Scene Navigation
+    <ul>
+      <li>Press <code>W</code><code>A</code><code>S</code><code>D</code> to move camera</li>
+      <li>Press <code>I</code><code>J</code><code>K</code><code>L</code> to rotate camera</li>
+      <li>Press <code>P</code> to globally pause / unpause animation</li>
+    </ul>
+  </div>
+  <!-- Scripts -->
+  <script src="lib/dat.gui.min.js"></script>
+  <script src="lib/GUI.js"></script>
+  <script src="lib/HuylerMichael_ProjA.js"></script>
+</body>
+
+</html>
