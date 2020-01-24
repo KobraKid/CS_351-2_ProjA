@@ -109,15 +109,15 @@ class PartSys {
     this.s0[zvel] = this.s1[zvel];
 
     if (solver_type == 0) { // EXPLICIT (adds energy)
-      this.s1[xpos] += this.s1[xvel] * (g_timeStep * 0.001);
-      this.s1[ypos] += this.s1[yvel] * (g_timeStep * 0.001);
-      this.s1[zpos] += this.s1[zvel] * (g_timeStep * 0.001);
+      this.s1[xpos] += this.s1[xvel] * (timeStep * 0.001);
+      this.s1[ypos] += this.s1[yvel] * (timeStep * 0.001);
+      this.s1[zpos] += this.s1[zvel] * (timeStep * 0.001);
       this.applyAllForces();
     } else if (solver_type == 1) { // IMPLICIT (loses energy)
       this.applyAllForces();
-      this.s1[xpos] += this.s1[xvel] * (g_timeStep * 0.001);
-      this.s1[ypos] += this.s1[yvel] * (g_timeStep * 0.001);
-      this.s1[zpos] += this.s1[zvel] * (g_timeStep * 0.001);
+      this.s1[xpos] += this.s1[xvel] * (timeStep * 0.001);
+      this.s1[ypos] += this.s1[yvel] * (timeStep * 0.001);
+      this.s1[zpos] += this.s1[zvel] * (timeStep * 0.001);
     } else {
       console.log('unknown solver: ' + solver_type);
       return;
@@ -180,7 +180,7 @@ class PartSys {
  *
  * @enum {number}
  */
-const FORCE_TYPE {
+const FORCE_TYPE = {
   FORCE_SIMP_GRAVITY: 0,
   FORCE_DRAG: 1,
   FORCE_WIND: 2,

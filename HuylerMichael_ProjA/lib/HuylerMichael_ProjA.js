@@ -6,17 +6,30 @@
  * @author Michael Huyler
  */
 
- /* WebGL variables */
- // GL context
- var gl;
- // HTML canvas
- var canvas;
- // Screen aspect ratio
- var aspect;
- // Ground plane VBOBox
- var vbo_0;
- // Array containing all VBOBoxes
- var vbo_boxes = [];
+/* WebGL variables */
+// GL context
+var gl;
+// HTML canvas
+var canvas;
+// Screen aspect ratio
+var aspect;
+// Timestep
+var timeStep = 1000.0 / 60.0;
+
+/* VBO Boxes */
+// Ground plane VBOBox
+var vbo_0;
+// Bouncy ball VBOBox
+var vbo_1;
+// Ball container visualization
+var vbo_2;
+// Array containing all VBOBoxes
+var vbo_boxes = [];
+
+/* Particle Systems */
+var INIT_VEL = 0.15 * 60.0;
+var PARTICLE_COUNT = 1;
+var bball = new PartSys(PARTICLE_COUNT);
 
 /**
  * Initialize global variables, event listeners, etc.
@@ -39,14 +52,24 @@ function main() {
   gl.clearColor(0.2, 0.2, 0.2, 1);
   gl.enable(gl.DEPTH_TEST);
 
+  canvas.onmousedown = function(ev) {
+    mouseDown(ev)
+  };
+  canvas.onmousemove = function(ev) {
+    mouseMove(ev)
+  };
+  canvas.onmouseup = function(ev) {
+    mouseUp(ev)
+  };
   window.addEventListener("keydown", keyDown, false);
 
   initGui();
-
+  initParticleSystems();
   initVBOBoxes();
 
   var tick = function() {
     requestAnimationFrame(tick, canvas);
+    updateAll();
     drawAll();
   };
   tick();
@@ -59,16 +82,13 @@ function initVBOBoxes() {
   var vertex_shader_0 = `
     precision highp float;
 
-    // ATTRIBUTES
-    attribute vec4 a_position_0;
-    attribute vec3 a_color_0;
-
-    // UNIFORMS
     uniform mat4 u_model_matrix_0;
     uniform mat4 u_view_matrix_0;
     uniform mat4 u_projection_matrix_0;
 
-    // VARYING
+    attribute vec4 a_position_0;
+    attribute vec3 a_color_0;
+
     varying vec4 v_color_0;
 
     void main() {
@@ -126,9 +146,260 @@ function initVBOBoxes() {
     verts[i + 5] = 40.0 / 255;
     verts[i + 6] = 80.0 / 255;
   }
-  vbo_0 = new VBOBox(vertex_shader_0, fragment_shader_0, verts, gl.LINES, 7, 4, 0, 3, 0);
+  vbo_0 = new VBOBox(vertex_shader_0, fragment_shader_0, verts, gl.LINES, 7, 4, 0, 3, 0, () => {});
   vbo_0.init();
   vbo_boxes.push(vbo_0);
+
+  var vertex_shader_1 = `
+    precision mediump float;
+
+    uniform mat4 u_model_matrix_1;
+    uniform mat4 u_view_matrix_1;
+    uniform mat4 u_projection_matrix_1;
+
+    attribute vec4 a_position_1;
+
+    varying vec4 v_color_1;
+
+    void main() {
+      gl_PointSize = 20.0;
+      gl_Position = u_projection_matrix_1 * u_view_matrix_1 * u_model_matrix_1 * a_position_1;
+      v_color_1 = vec4(0.2, 1.0, 0.2, 1.0);
+    }`;
+  var fragment_shader_1 = `
+    precision mediump float;
+
+    // VARYING
+    varying vec4 v_color_1;
+
+    void main() {
+      float dist = distance(gl_PointCoord, vec2(0.5, 0.5));
+      if (dist < 0.5) {
+        gl_FragColor = vec4((1.0 - 2.0 * dist) * v_color_1.rgb, 1.0);
+      } else { discard; }
+    }`;
+  vbo_1 = new VBOBox(vertex_shader_1, fragment_shader_1, new Float32Array(PARTICLE_COUNT * STATE_SIZE), gl.POINTS, STATE_SIZE, 3, 0, 0, 1, () => {
+    bball.render(vbo_1);
+  });
+  vbo_1.init();
+  vbo_boxes.push(vbo_1);
+
+  var vertex_shader_2 =
+    `precision mediump float;
+
+    uniform mat4 u_model_matrix_2;
+    uniform mat4 u_view_matrix_2;
+    uniform mat4 u_projection_matrix_2;
+
+    attribute vec3 a_position_2;
+    attribute vec3 a_color_2;
+
+    varying vec3 v_color_2;
+
+    void main() {
+      gl_Position = u_projection_matrix_2 * u_view_matrix_2 * u_model_matrix_2 * vec4(a_position_2, 1.0);
+      v_color_2 = a_color_2;
+    }`;
+  var fragment_shader_2 =
+    `precision mediump float;
+
+    varying vec3 v_color_2;
+
+    void main() {
+      gl_FragColor = vec4(v_color_2, 1.0);
+    }`;
+  vbo_2 = new VBOBox(vertex_shader_2, fragment_shader_2, new Float32Array([
+      0, 0, 0, 0, 0, 0,
+      0.9, 0, 0, 0, 0, 0,
+
+      0, 0, 0, 0, 0, 0,
+      0, 0.9, 0, 0, 0, 0,
+
+      0, 0, 0, 0, 0, 0,
+      0, 0, 0.9, 0, 0, 0,
+
+      0.9, 0, 0, 0, 0, 0,
+      0.9, 0, 0.9, 0, 0, 0,
+
+      0.9, 0, 0, 0, 0, 0,
+      0.9, 0.9, 0, 0, 0, 0,
+
+      0, 0.9, 0, 0, 0, 0,
+      0, 0.9, 0.9, 0, 0, 0,
+
+      0, 0.9, 0, 0, 0, 0,
+      0.9, 0.9, 0, 0, 0, 0,
+
+      0.9, 0.9, 0, 0, 0, 0,
+      0.9, 0.9, 0.9, 0, 0, 0,
+
+      0, 0, 0.9, 0, 0, 0,
+      0.9, 0, 0.9, 0, 0, 0,
+
+      0, 0, 0.9, 0, 0, 0,
+      0, 0.9, 0.9, 0, 0, 0,
+
+      0.9, 0, 0.9, 0, 0, 0,
+      0.9, 0.9, 0.9, 0, 0, 0,
+
+      0, 0.9, 0.9, 0, 0, 0,
+      0.9, 0.9, 0.9, 0, 0, 0,
+
+    ]),
+    gl.LINES, 6, 3, 0, 3, 2, () => {});
+  vbo_2.init();
+  vbo_boxes.push(vbo_2);
+}
+
+/**
+ * Initializes all of the particle systems.
+ */
+function initParticleSystems() {
+  bball.init(0,
+    [
+      // gravity
+      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, 0, 0, 1, -tracker.gravity * (timeStep * 0.001), TIMEOUT_NO_TIMEOUT),
+      // air drag
+      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT),
+    ],
+    [
+      /* Velocity Reverse Floor Bounce */
+      // bounce on left wall
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 0 && (s1[xpos] < 0.0 && s1[xvel] < 0.0);
+        },
+        function(s0, s1) {
+          s1[xvel] = -tracker.restitution * s1[xvel];
+        }
+      ),
+      // bounce on right wall
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 0 && (s1[xpos] > 0.9 && s1[xvel] > 0.0);
+        },
+        function(s0, s1) {
+          s1[xvel] = -tracker.restitution * s1[xvel];
+        }
+      ),
+      // bounce on front wall
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 0 && (s1[ypos] < 0.0 && s1[yvel] < 0.0);
+        },
+        function(s0, s1) {
+          s1[yvel] = -tracker.restitution * s1[yvel];
+        }
+      ),
+      // bounce on back wall
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 0 && (s1[ypos] > 0.9 && s1[yvel] > 0.0);
+        },
+        function(s0, s1) {
+          s1[yvel] = -tracker.restitution * s1[yvel];
+        }
+      ),
+      // bounce on floor
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 0 && (s1[zpos] < 0.0 && s1[zvel] < 0.0);
+        },
+        function(s0, s1) {
+          s1[zvel] = -tracker.restitution * s1[zvel];
+        }
+      ),
+      // bounce on ceiling
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 0 && (s1[zpos] > 0.9 && s1[zvel] > 0.0);
+        },
+        function(s0, s1) {
+          s1[zvel] = -tracker.restitution * s1[zvel];
+        }
+      ),
+      // hard limit on 'floor' keeps z position >= 0;
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 0 && (s1[zpos] < 0.0);
+        },
+        function(s0, s1) {
+          s1[zpos] = 0.0;
+        }
+      ),
+      /* Impulsive Floor Bounce */
+      // bounce on left wall
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 1 && (s1[xpos] < 0.0 && s1[xvel] < 0.0);
+        },
+        function(s0, s1) {
+          s1[xpos] = 0.0;
+          s1[xvel] = Math.abs(s0[xvel]) * tracker.drag * tracker.restitution;
+        }
+      ),
+      // bounce on right wall
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 1 && (s1[xpos] > 0.9 && s1[xvel] > 0.0)
+        },
+        function(s0, s1) {
+          s1[xpos] = 0.9;
+          s1[xvel] = -1 * Math.abs(s0[xvel]) * tracker.drag * tracker.restitution;
+        }
+      ),
+      // bounce on front wall
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 1 && (s1[ypos] < 0.0 && s1[yvel] < 0.0);
+        },
+        function(s0, s1) {
+          s1[ypos] = 0.0;
+          s1[yvel] = Math.abs(s0[yvel]) * tracker.drag * tracker.restitution;
+        }
+      ),
+      // bounce on back wall
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 1 && (s1[ypos] > 0.9 && s1[yvel] > 0.0)
+        },
+        function(s0, s1) {
+          s1[ypos] = 0.9;
+          s1[yvel] = -1 * Math.abs(s0[yvel]) * tracker.drag * tracker.restitution;
+        }
+      ),
+      // bounce on floor
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 1 && (s1[zpos] < 0.0 && s1[zvel] < 0.0)
+        },
+        function(s0, s1) {
+          s1[zpos] = 0.0;
+          s1[zvel] = Math.abs(s0[zvel]) * tracker.drag * tracker.restitution;
+        }
+      ),
+      // bounce on ceiling
+      new Constraint(
+        function(s0, s1) {
+          return tracker.bounce_type == 1 && (s1[zpos] > 0.9 && s1[zvel] > 0.0)
+        },
+        function(s0, s1) {
+          s1[zpos] = 0.9;
+          s1[zvel] = -1 * Math.abs(s0[zvel]) * tracker.drag * tracker.restitution;
+        }
+      )
+    ]
+  );
+}
+
+/**
+ * Updates all of the Particle Systems.
+ */
+function updateAll() {
+  if (!tracker.pause) {
+    bball.solver(tracker.solver);
+    bball.doConstraints();
+  }
 }
 
 /**

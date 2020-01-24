@@ -10,7 +10,21 @@
 var gui;
 var gui_open = true;
 var GuiTracker = function() {
-  // this.test_var = 0;
+  this.vel_x = 0;
+  this.vel_y = 0;
+  this.vel_z = 0;
+  this.addVel = function() {
+    bball.addForce(new Force(FORCE_WIND, 1, 0, 0, this.vel_x, TIMEOUT_INSTANT));
+    bball.addForce(new Force(FORCE_WIND, 0, 1, 0, this.vel_y, TIMEOUT_INSTANT));
+    bball.addForce(new Force(FORCE_WIND, 0, 0, 1, this.vel_z, TIMEOUT_INSTANT));
+  }
+  this.drag = 0.985;
+  this.gravity = 9.832;
+  this.restitution = 1.0;
+  this.solver = 1;
+  this.bounce_type = 1;
+  this.clear = true;
+  this.pause = false;
 }
 var tracker = new GuiTracker();
 var help_visible = false;
@@ -23,7 +37,19 @@ function initGui() {
     name: 'My GUI',
     hideable: false
   });
-  // gui.add(tracker, 'test_var').name('Test Variable');
+  var addVelocity = gui.addFolder('Add Velocity');
+  addVelocity.add(tracker, 'vel_x', -9, 9, 0.5);
+  addVelocity.add(tracker, 'vel_y', -9, 9, 0.5);
+  addVelocity.add(tracker, 'vel_z', -9, 9, 0.5);
+  addVelocity.add(tracker, 'addVel').name('Click to bounce!');
+  addVelocity.open();
+  gui.add(tracker, 'drag', 0, 1, 0.005);
+  gui.add(tracker, 'gravity', 0);
+  gui.add(tracker, 'restitution');
+  gui.add(tracker, 'solver', {'Explicit': 0, 'Implicit': 1});
+  gui.add(tracker, 'bounce_type', {'Velocity Reverse': 0, 'Impulsive': 1}).name('bounce type');
+  gui.add(tracker, 'clear').name('Clear screen?').listen();
+  gui.add(tracker, 'pause').name('Pause').listen();
   if (gui_open)
     gui.close();
   document.getElementsByClassName('close-bottom')[0].onclick = function() {

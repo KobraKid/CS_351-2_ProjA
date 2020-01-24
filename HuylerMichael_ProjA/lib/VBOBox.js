@@ -33,7 +33,8 @@ class VBOBox {
    * @param {number} box_num The index of this box.
    */
   constructor(VERTEX_SHADER, FRAGMENT_SHADER, vertex_array, draw_method,
-    attribute_count, pos_count, norm_count, color_count, box_num) {
+    attribute_count, pos_count, norm_count, color_count, box_num,
+    adjust_function) {
     /* GLSL shader code */
     this.VERTEX_SHADER = VERTEX_SHADER;
     this.FRAGMENT_SHADER = FRAGMENT_SHADER;
@@ -81,6 +82,9 @@ class VBOBox {
 
     /* VBOBox index */
     this.box_num = box_num;
+
+    /* Adjust function */
+    this.custom_adjust = adjust_function;
   }
 
   get model_matrix() {
@@ -249,6 +253,7 @@ class VBOBox {
    * Adjusts matrices every frame, sends new values to the GPU.
    */
   adjust() {
+    this.custom_adjust();
     glMatrix.mat4.perspective(this.projection_matrix, 30 * aspect, aspect, 1, 100);
     glMatrix.mat4.lookAt(
       this.view_matrix,
