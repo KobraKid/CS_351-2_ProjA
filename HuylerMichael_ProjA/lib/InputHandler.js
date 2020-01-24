@@ -1,11 +1,15 @@
 /**
  * Input handler.
  *
- * Handles all user inputs - keyboard & mouse.
+ * Handles all program inputs, including keypress events, mouse events, and
+ * page resize events.
  *
  * @author Michael Huyler
  */
 
+/**
+ * Handles keypress events.
+ */
 function keyDown(kev) {
   var code;
   if (!kev.code) {
@@ -28,6 +32,12 @@ function keyDown(kev) {
   }
 }
 
+/**
+ * Handles page resize events.
+ *
+ * Resizes the canvas and calls WebGLRenderingContext.viewport() to resize the
+ * current rendering context according to the new canvas size and aspect ratio.
+ */
 function drawResize() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;

@@ -1,5 +1,5 @@
 /**
- * Classes related to Particle Systems.
+ * Classes used to implement a Particle Systems.
  *
  * @author Michael Huyler
  */
@@ -12,7 +12,7 @@ var xvel = 3;
 var yvel = 4;
 var zvel = 5;
 
-/*
+/**
  * Abstract Particle System.
  */
 class PartSys {
@@ -68,12 +68,19 @@ class PartSys {
     }
   }
 
+  /**
+   * Sets up a particular particle system, influencing its general behavior.
+   *
+   * @param {number} part_sys_type The type of particle system to create.
+   * @param {Array<Force>} force_set The set of initial forces acting on this particle system.
+   * @param {Array<Constraint>} constraint_set The set of initial constraints limiting this particle system.
+   */
   init(part_sys_type, force_set, constraint_set) {
     this.force_set = force_set;
     this.constraint_set = constraint_set;
   }
 
-  /*
+  /**
    * Applys all forces in forceArray, modifying state array s.
    */
   applyAllForces() {
@@ -81,15 +88,17 @@ class PartSys {
     this.force_set = this.force_set.filter(force => !force.expired());
   }
 
-  /*
+  /**
    * Finds the derivative w.r.t. time of state s.
    */
   dotFinder() {
     this._sdot = new Float32Array(this.s1.length());
   }
 
-  /*
+  /**
    * Creates s1 by approximating integration of s0 over a single timestep.
+   *
+   * @param {number} solver_type The type of solver to use.
    */
   solver(solver_type) {
     this.s0[xpos] = this.s1[xpos];
@@ -115,7 +124,7 @@ class PartSys {
     }
   }
 
-  /*
+  /**
    * Applies all constraints for a given system.
    */
   doConstraints() {
@@ -124,44 +133,79 @@ class PartSys {
     });
   }
 
-  /*
-   * Updates values stored in the GPU and performs a draw call.
+  /**
+   * Updates values for transferring to the GPU.
+   *
+   * @param {VBOBox} box The VBOBox whose VBO should be updated.
    */
   render(box) {
     // Send to the VBO box to call WebGLRenderingContext.bufferSubData()
     box.vbo = this.s1;
+    box.reload();
   }
 
+  /**
+   * Swaps two state vectors.
+   *
+   * @param {Float32Array} s0 The previous state vector.
+   * @param {Float32Array} s1 The current state vector.
+   */
   swap(s0, s1) {
     [s0, s1] = [s1, s0];
   }
 
+  /**
+   * Adds a new force to the particle system, or replaces the set of forces
+   * with a new set if an array is passed in.
+   *
+   * @param {Force} f The force to be added to this particle system.
+   */
   addForce(f) {
     this.force_set = f;
   }
 
+  /**
+   * Adds a new constraint to the particle system, or replaces the set of
+   * constraints with a new set if an array is passed in.
+   *
+   * @param {Constraint} c The constraint to be added to this particle system.
+   */
   addConstraint(c) {
     this.constraint_set = c;
   }
 }
 
-// Type of force to apply
-var FORCE_SIMP_GRAVITY = 0;
-var FORCE_DRAG = 1;
-var FORCE_WIND = 2;
-var FORCE_SPRING = 3;
-var FORCE_CHARGE = 4;
-var FORCE_FLOCK = 5;
-var FORCE_GRAVITY = 6;
+/**
+ * Types of Forces.
+ *
+ * @enum {number}
+ */
+const FORCE_TYPE {
+  FORCE_SIMP_GRAVITY: 0,
+  FORCE_DRAG: 1,
+  FORCE_WIND: 2,
+  FORCE_SPRING: 3,
+  FORCE_CHARGE: 4,
+  FORCE_FLOCK: 5,
+  FORCE_GRAVITY: 6,
+}
 
 // How long the force should stay active
 var TIMEOUT_NO_TIMEOUT = -1;
 var TIMEOUT_INSTANT = 1;
 
-/*
+/**
  * Creates a force in a particular direction for a specific duration.
  */
 class Force {
+  /**
+   * @param {FORCE_TYPE} type The type of force to implement.
+   * @param {number} x The x component of the force vector.
+   * @param {number} y The y component of the force vector.
+   * @param {number} z The z component of the force vector.
+   * @param {number} magnitude The magnitude of the force vector.
+   * @param {number} timeout How long the force should last.
+   */
   constructor(type, x, y, z, magnitude, timeout) {
     this._type = type;
     this._x = x;
@@ -184,52 +228,86 @@ class Force {
     return this._magnitude;
   }
 
+  /**
+   * Applies this force to a given state vector.
+   *
+   * @param {Float32Array} s The state vector to apply this force to.
+   */
   apply(s) {
     switch (this._type) {
-      case FORCE_SIMP_GRAVITY:
+      case FORCE_TYPE.FORCE_SIMP_GRAVITY:
         s[zvel] += this.magnitude;
         break;
-      case FORCE_DRAG:
+      case FORCE_TYPE.FORCE_DRAG:
         s[xvel] *= (this.x * this.magnitude);
         s[yvel] *= (this.y * this.magnitude);
         s[zvel] *= (this.z * this.magnitude);
         break;
-      case FORCE_WIND:
+      case FORCE_TYPE.FORCE_WIND:
         s[xvel] += this.x * this.magnitude;
         s[yvel] += this.y * this.magnitude;
         s[zvel] += this.z * this.magnitude;
         break;
       default:
+        console.log("Unimplemented force type: " + this._type);
         return;
     }
     if (this.expires()) this._t -= 1;
   }
 
+  /**
+   * Checks if this force can time out.
+   *
+   * @return {boolean} Whether this force can time out.
+   */
   expires() {
-    // Return true if this force should eventually timeout
     return (this._t >= 0);
   }
 
+  /**
+   * Checks if this force has expired.
+   *
+   * @return {boolean} Whether this force has expired.
+   */
   expired() {
     return this.expires() && this._t == 0;
   }
 
 }
 
-/*
- * Creates rules for a constraint, and a handler function to be called if a
- * constraint is not met.
+/**
+ * Creates rules for a constraint, and a function to be called to fix the
+ * state vector if a constraint is not met.
  */
 class Constraint {
+  /**
+   * @param {function(Float32Array, Float32Array): boolean} predicate The
+   *    predicate used to test whether this constraint has been met.
+   * @param {function(Float32Array, Float32Array): undefined} fix The function
+   *    used to repair the state vector.
+   */
   constructor(predicate, fix) {
     this._predicate = predicate;
     this._fix = fix;
   }
 
+  /**
+   * Checks whether the constraint has been met.
+   *
+   * @param {Float32Array} s0 The previous state vector.
+   * @param {Float32Array} s1 The current state vector.
+   * @return {boolean} Returns true when the constraint is not met.
+   */
   isNotMet(s0, s1) {
     return this._predicate(s0, s1);
   }
 
+  /**
+   * Ensures the current state vector meets this constraint.
+   *
+   * @param {Float32Array} s0 The previous state vector.
+   * @param {Float32Array} s1 The current state vector.
+   */
   constrain(s0, s1) {
     if (this.isNotMet(s0, s1)) {
       this._fix(s0, s1);

@@ -6,19 +6,17 @@
  * @author Michael Huyler
  */
 
-// GL context
-var gl;
-// HTML canvas
-var canvas;
-// Screen aspect ratio
-var aspect;
-// Ground plane VBOBox
-var vbo_0;
-// Tick function
-var tick = function() {
-  requestAnimationFrame(tick, canvas);
-  drawAll();
-}
+ /* WebGL variables */
+ // GL context
+ var gl;
+ // HTML canvas
+ var canvas;
+ // Screen aspect ratio
+ var aspect;
+ // Ground plane VBOBox
+ var vbo_0;
+ // Array containing all VBOBoxes
+ var vbo_boxes = [];
 
 /**
  * Initialize global variables, event listeners, etc.
@@ -45,12 +43,19 @@ function main() {
 
   initGui();
 
-  initVBO();
+  initVBOBoxes();
 
+  var tick = function() {
+    requestAnimationFrame(tick, canvas);
+    drawAll();
+  };
   tick();
 }
 
-function initVBO() {
+/**
+ * Initializes all of the VBOBoxes.
+ */
+function initVBOBoxes() {
   var vertex_shader_0 = `
     precision highp float;
 
@@ -123,12 +128,18 @@ function initVBO() {
   }
   vbo_0 = new VBOBox(vertex_shader_0, fragment_shader_0, verts, gl.LINES, 7, 4, 0, 3, 0);
   vbo_0.init();
+  vbo_boxes.push(vbo_0);
 }
 
+/**
+ * Draws all of the VBOBoxes.
+ */
 function drawAll() {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  vbo_0.enable();
-  vbo_0.adjust();
-  vbo_0.draw();
+  vbo_boxes.forEach((box, _) => {
+    box.enable();
+    box.adjust();
+    box.draw();
+  });
 }

@@ -4,21 +4,34 @@
  * @author Michael Huyler
  */
 
-/* Camera */
+/* Camera variables */
 // where the camera is
 var g_perspective_eye = [6, 0, 1];
 // where the camera is pointing
 var g_perspective_lookat = [0, 0, 0];
+// the camera's up axis
 var g_perspective_up = [0, 0, 1];
+// rotation step
 var theta = 3.14;
 
-/*
+/**
  * A complete encapsulation of a VBO and its corresponding shader program.
  *
  * Provides an easy way to switch between VBOs, especially those which use
  * different shaders, or which have different attribute sets.
  */
 class VBOBox {
+  /**
+   * @param {string} VERTEX_SHADER The vertex shader for this box.
+   * @param {string} FRAGMENT_SHADER The fragment shader for this box.
+   * @param {Float32Array} vertex_array An array of vertices to be loaded into the VBO.
+   * @param {GLenum} draw_method The mode to be used when calling WebGLRenderingContext.drawArrays().
+   * @param {number} attribute_count The number of attributes each vertex has.
+   * @param {number} pos_count The number of attributes used to describe the position vector.
+   * @param {number} norm_count The number of attributes used to describe the normal vector.
+   * @param {number} color_count The number of attributes used to describe the color.
+   * @param {number} box_num The index of this box.
+   */
   constructor(VERTEX_SHADER, FRAGMENT_SHADER, vertex_array, draw_method,
     attribute_count, pos_count, norm_count, color_count, box_num) {
     /* GLSL shader code */
@@ -99,6 +112,9 @@ class VBOBox {
     this._view_matrix = matrix;
   }
 
+  /**
+   * Initializes a VBOBox, finds GPU locaiton of all variables.
+   */
   init() {
     this.shader_loc =
       createProgram(gl, this.VERTEX_SHADER, this.FRAGMENT_SHADER);
@@ -171,6 +187,10 @@ class VBOBox {
     }
   }
 
+  /**
+   * Enables a VBOBox, switching the GPU over to the box's program and enables
+   * the current program's attribute arrays.
+   */
   enable() {
     gl.useProgram(this.shader_loc);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo_loc);
@@ -208,6 +228,9 @@ class VBOBox {
     }
   }
 
+  /**
+   * Ensures that this VBOBox is ready to be used.
+   */
   validate() {
     if (gl.getParameter(gl.CURRENT_PROGRAM) != this.shader_loc) {
       console.log(this.constructor.name +
@@ -222,6 +245,9 @@ class VBOBox {
     return true;
   }
 
+  /**
+   * Adjusts matrices every frame, sends new values to the GPU.
+   */
   adjust() {
     glMatrix.mat4.perspective(this.projection_matrix, 30 * aspect, aspect, 1, 100);
     glMatrix.mat4.lookAt(
@@ -236,6 +262,10 @@ class VBOBox {
     gl.uniformMatrix4fv(this.u_projection_matrix_loc, false, this.projection_matrix);
   }
 
+  /**
+   * Draws the current VBOBox, using the currently loaded program, variables
+   * and VBO contents.
+   */
   draw() {
     if (!this.validate()) {
       console.log('ERROR: Before .draw() you need to call .enable()');
@@ -243,7 +273,13 @@ class VBOBox {
     gl.drawArrays(this.draw_method, 0, this.vertex_count);
   }
 
+  /**
+   * Reloads the contents of the VBO.
+   *
+   * Useful if independent vertices should move. Modifications to this VBOBox's
+   * vbo array will be substituted into the GPU's VBO.
+   */
   reload() {
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this._vbo);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vbo);
   }
 }

@@ -1,7 +1,8 @@
 /**
  * GUI Manager.
  *
- * Handles setting up the GUI and handling interactions with it.
+ * Handles setting up the GUI and help menu and sets up helper functions to
+ * toggle the menus.
  *
  * @author Michael Huyler
  */
@@ -14,6 +15,9 @@ var GuiTracker = function() {
 var tracker = new GuiTracker();
 var help_visible = false;
 
+/**
+ * Initializes the GUI.
+ */
 function initGui() {
   gui = new dat.GUI({
     name: 'My GUI',
@@ -27,6 +31,9 @@ function initGui() {
   };
 }
 
+/**
+ * Toggles the GUI.
+ */
 function toggle_gui() {
   gui_open = !gui_open;
   if (gui_open)
@@ -35,6 +42,9 @@ function toggle_gui() {
     gui.close();
 }
 
+/**
+ * Toggles the help menu.
+ */
 function toggle_help() {
   help_visible = !help_visible;
   document.getElementById("help-menu-expanded").style.visibility = help_visible ? "visible" : "hidden";
