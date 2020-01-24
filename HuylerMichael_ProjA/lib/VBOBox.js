@@ -6,9 +6,9 @@
 
 /* Camera */
 // where the camera is
-var g_perspective_eye = [15, 0, 1];
+var g_perspective_eye = [6, 0, 1];
 // where the camera is pointing
-var g_perspective_lookat = [14, 0, 1];
+var g_perspective_lookat = [0, 0, 0];
 var g_perspective_up = [0, 0, 1];
 var theta = 3.14;
 
@@ -123,7 +123,7 @@ class VBOBox {
     if (this.a_position_location < 0) {
       console.log(this.constructor.name +
         '.init() Failed to get GPU location of a_position_' + this.box_num + ' attribute');
-      return -1;
+      return;
     }
 
     if (this.vertex_norm_count > 0) {
@@ -132,7 +132,7 @@ class VBOBox {
       if (this.a_normal_location < 0) {
         console.log(this.constructor.name +
           '.init() failed to get the GPU location of a_normal_' + this.box_num + ' attribute');
-        return -1;
+        return;
       }
     }
 
@@ -142,7 +142,7 @@ class VBOBox {
       if (this.a_color_location < 0) {
         console.log(this.constructor.name +
           '.init() failed to get the GPU location of a_color_' + this.box_num + ' attribute');
-        return -1;
+        return;
       }
     }
 
@@ -175,7 +175,7 @@ class VBOBox {
     gl.useProgram(this.shader_loc);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo_loc);
     gl.vertexAttribPointer(
-      this.a_pos_loc,
+      this.a_position_location,
       this.vertex_pos_count,
       gl.FLOAT,
       false,
@@ -183,29 +183,28 @@ class VBOBox {
       this.vertex_pos_offset);
     if (this.vertex_norm_count > 0) {
       gl.vertexAttribPointer(
-        this.a_norm_loc,
+        this.a_normal_location,
         this.vertex_norm_count,
         gl.FLOAT,
         false,
         this.vbo_stride,
         this.vertex_norm_offset);
-      gl.enableVertexAttribArray(this.a_norm_loc);
     }
     if (this.vertex_color_count > 0) {
       gl.vertexAttribPointer(
-        this.a_color_loc,
+        this.a_color_location,
         this.vertex_color_count,
         gl.FLOAT,
         false,
         this.vbo_stride,
         this.vertex_color_offset);
     }
-    gl.enableVertexAttribArray(this.a_pos_loc);
+    gl.enableVertexAttribArray(this.a_position_location);
     if (this.vertex_norm_count > 0) {
-      gl.enableVertexAttribArray(this.a_norm_loc);
+      gl.enableVertexAttribArray(this.a_normal_location);
     }
     if (this.vertex_color_count > 0) {
-      gl.enableVertexAttribArray(this.a_color_loc);
+      gl.enableVertexAttribArray(this.a_color_location);
     }
   }
 
@@ -227,12 +226,11 @@ class VBOBox {
     glMatrix.mat4.perspective(this.projection_matrix, 30 * aspect, aspect, 1, 100);
     glMatrix.mat4.lookAt(
       this.view_matrix,
-      g_perspective_eye[0], g_perspective_eye[1], g_perspective_eye[2],
-      g_perspective_lookat[0], g_perspective_lookat[1], g_perspective_lookat[2],
-      g_perspective_up[0], g_perspective_up[1], g_perspective_up[2],
+      glMatrix.vec3.fromValues(g_perspective_eye[0], g_perspective_eye[1], g_perspective_eye[2]),
+      glMatrix.vec3.fromValues(g_perspective_lookat[0], g_perspective_lookat[1], g_perspective_lookat[2]),
+      glMatrix.vec3.fromValues(g_perspective_up[0], g_perspective_up[1], g_perspective_up[2]),
     );
     glMatrix.mat4.identity(this.model_matrix);
-
     gl.uniformMatrix4fv(this.u_model_matrix_loc, false, this.model_matrix);
     gl.uniformMatrix4fv(this.u_view_matrix_loc, false, this.view_matrix);
     gl.uniformMatrix4fv(this.u_projection_matrix_loc, false, this.projection_matrix);

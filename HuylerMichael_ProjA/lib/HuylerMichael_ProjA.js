@@ -64,23 +64,21 @@ function initVBO() {
     uniform mat4 u_projection_matrix_0;
 
     // VARYING
-    varying vec3 v_color_0;
+    varying vec4 v_color_0;
 
     void main() {
-      u_projection_matrix_0;
-      u_view_matrix_0;
-  		gl_Position = u_model_matrix_0 * a_position_0;
-  		v_color_0 = a_color_0;
+  		gl_Position = u_projection_matrix_0 * u_view_matrix_0 * u_model_matrix_0 * a_position_0;
+  		v_color_0 = vec4(a_color_0, 1.0);
     }
   `;
   var fragment_shader_0 = `
     precision highp float;
 
     // VARYING
-    varying vec3 v_color_0;
+    varying vec4 v_color_0;
 
     void main() {
-      gl_FragColor = vec4(v_color_0, 1.0);
+      gl_FragColor = v_color_0;
     }
   `;
   var xcount = 10;
@@ -123,7 +121,7 @@ function initVBO() {
     verts[i + 5] = 40.0 / 255;
     verts[i + 6] = 80.0 / 255;
   }
-  vbo_0 = new VBOBox(vertex_shader_0, fragment_shader_0, verts, gl.LINES, 7, 3, 0, 0, 0);
+  vbo_0 = new VBOBox(vertex_shader_0, fragment_shader_0, verts, gl.LINES, 7, 4, 0, 3, 0);
   vbo_0.init();
 }
 
