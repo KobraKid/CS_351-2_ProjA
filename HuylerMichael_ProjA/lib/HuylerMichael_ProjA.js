@@ -51,61 +51,7 @@ function main() {
 }
 
 function initVBO() {
-  // Ground Grid
-  {
-    var xcount = 15;
-    var zcount = 15;
-    var xzmax = 5.0;
-    var v = 0;
-    var j = 0;
-    verts = new Float32Array(7 * 2 * (xcount + zcount));
-    var xgap = xzmax / (xcount - 1);
-    var zgap = xzmax / (zcount - 1);
-    for (v = 0, j = 0; v < 2 * xcount; v++, j += 7) {
-      if (v % 2 == 0) {
-        verts[j] = -xzmax + (v) * xgap;
-        verts[j + 1] = -xzmax;
-        verts[j + 2] = 0.0;
-        verts[j + 3] = 1.0;
-      } else {
-        verts[j] = -xzmax + (v - 1) * xgap;
-        verts[j + 1] = xzmax;
-        verts[j + 2] = 0.0;
-        verts[j + 3] = 1.0;
-      }
-    }
-    for (v = 0; v < 2 * zcount; v++, j += 7) {
-      if (v % 2 == 0) {
-        verts[j] = -xzmax;
-        verts[j + 1] = -xzmax + (v) * zgap;
-        verts[j + 2] = 0.0;
-        verts[j + 3] = 1.0;
-      } else {
-        verts[j] = xzmax;
-        verts[j + 1] = -xzmax + (v - 1) * zgap;
-        verts[j + 2] = 0.0;
-        verts[j + 3] = 1.0;
-      }
-    }
-    for (var i = 0; i < verts.length; i += 7) {
-      verts[i + 4] = 0 / 255;
-      verts[i + 5] = 40 / 255;
-      verts[i + 6] = 80 / 255;
-    }
-    console.log(verts);
-  }
-  // var verts = new Float32Array(10 * 100);
-  // for (var i = 0; i < 100; i++) {
-  //   verts[i + 0] = Math.random() / 2;
-  //   verts[i + 1] = Math.random() / 2;
-  //   verts[i + 2] = 1.0;
-  //   verts[i + 3] = 1.0;
-  //   verts[i + 4] = 0 / 255;
-  //   verts[i + 5] = 40 / 255;
-  //   verts[i + 6] = 80 / 255;
-  // }
-
-  var ground_plane_vertex_shader = `
+  var vertex_shader_0 = `
     precision highp float;
 
     // ATTRIBUTES
@@ -114,37 +60,70 @@ function initVBO() {
 
     // UNIFORMS
     uniform mat4 u_model_matrix_0;
+    uniform mat4 u_view_matrix_0;
+    uniform mat4 u_projection_matrix_0;
 
     // VARYING
-    varying vec3 v_position_0;
     varying vec3 v_color_0;
 
     void main() {
-  		gl_Position = a_position_0;
+      u_projection_matrix_0;
+      u_view_matrix_0;
+  		gl_Position = u_model_matrix_0 * a_position_0;
   		v_color_0 = a_color_0;
-      u_model_matrix_0;
     }
   `;
-  var ground_plane_fragment_shader = `
+  var fragment_shader_0 = `
     precision highp float;
 
     // VARYING
-    varying vec3 v_position_0;
     varying vec3 v_color_0;
 
     void main() {
       gl_FragColor = vec4(v_color_0, 1.0);
     }
   `;
-  vbo_0 = new VBOBox(
-    ground_plane_vertex_shader,
-    ground_plane_fragment_shader,
-    verts,
-    7,
-    4,
-    0,
-    3,
-    0);
+  var xcount = 10;
+  var ycount = 10;
+  var xymax = 5.0;
+  var v = 0;
+  var j = 0;
+  var verts = new Float32Array(7 * 2 * (xcount + ycount));
+
+  var xgap = xymax / (xcount - 1);
+  var ygap = xymax / (ycount - 1);
+  for (v = 0, j = 0; v < 2 * xcount; v++, j += 7) {
+    if (v % 2 == 0) {
+      verts[j] = -xymax + (v) * xgap;
+      verts[j + 1] = -xymax;
+      verts[j + 2] = 0.0;
+      verts[j + 3] = 1.0;
+    } else {
+      verts[j] = -xymax + (v - 1) * xgap;
+      verts[j + 1] = xymax;
+      verts[j + 2] = 0.0;
+      verts[j + 3] = 1.0;
+    }
+  }
+  for (v = 0; v < 2 * ycount; v++, j += 7) {
+    if (v % 2 == 0) {
+      verts[j] = -xymax;
+      verts[j + 1] = -xymax + (v) * ygap;
+      verts[j + 2] = 0.0;
+      verts[j + 3] = 1.0;
+    } else {
+      verts[j] = xymax;
+      verts[j + 1] = -xymax + (v - 1) * ygap;
+      verts[j + 2] = 0.0;
+      verts[j + 3] = 1.0;
+    }
+  }
+  for (var i = 0; i < verts.length; i += 7) {
+    verts[i + 4] = 0.0 / 255;
+    verts[i + 5] = 40.0 / 255;
+    verts[i + 6] = 80.0 / 255;
+  }
+  vbo_0 = new VBOBox(vertex_shader_0, fragment_shader_0, verts, gl.LINES, 7, 3, 0, 0, 0);
   vbo_0.init();
 }
 
