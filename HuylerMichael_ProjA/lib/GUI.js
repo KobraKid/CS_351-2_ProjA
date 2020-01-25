@@ -47,7 +47,15 @@ function initGui() {
   gui.add(tracker, 'gravity', 0);
   gui.add(tracker, 'restitution');
   gui.add(tracker, 'solver', {'Explicit': 0, 'Implicit': 1});
-  gui.add(tracker, 'bounce_type', {'Velocity Reverse': 0, 'Impulsive': 1}).name('bounce type');
+  gui.add(tracker, 'bounce_type', {'Velocity Reverse': 0, 'Impulsive': 1}).name('bounce type').onChange(function(value) {
+    if (value == 0) {
+      bball.removeConstraint(0);
+      bball.addConstraint(new Constraint(CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE, [...Array(PARTICLE_COUNT).keys()], 0, 0.9, 0, 0.9, 0, 0.9));
+    } else if (value == 1) {
+      bball.removeConstraint(0);
+      bball.addConstraint(new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, [...Array(PARTICLE_COUNT).keys()], 0, 0.9, 0, 0.9, 0, 0.9));
+    }
+  });
   gui.add(tracker, 'clear').name('Clear screen?').listen();
   gui.add(tracker, 'pause').name('Pause').listen();
   if (gui_open)
