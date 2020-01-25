@@ -28,7 +28,7 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var PARTICLE_COUNT = 1;
+var PARTICLE_COUNT = 2;
 var bball = new PartSys(PARTICLE_COUNT);
 
 /**
@@ -180,6 +180,7 @@ function initVBOBoxes() {
     }`;
   vbo_1 = new VBOBox(vertex_shader_1, fragment_shader_1, new Float32Array(PARTICLE_COUNT * STATE_SIZE), gl.POINTS, STATE_SIZE, 3, 0, 0, 1, () => {
     bball.render(vbo_1);
+    bball.swap();
   });
   vbo_1.init();
   vbo_boxes.push(vbo_1);
@@ -263,131 +264,71 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT),
     ],
     [
-      /* Velocity Reverse Floor Bounce */
-      // bounce on left wall
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 0 && (s1[xpos] < 0.0 && s1[xvel] < 0.0);
-        },
-        function(s0, s1) {
-          s1[xvel] = -tracker.restitution * s1[xvel];
-        }
-      ),
-      // bounce on right wall
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 0 && (s1[xpos] > 0.9 && s1[xvel] > 0.0);
-        },
-        function(s0, s1) {
-          s1[xvel] = -tracker.restitution * s1[xvel];
-        }
-      ),
-      // bounce on front wall
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 0 && (s1[ypos] < 0.0 && s1[yvel] < 0.0);
-        },
-        function(s0, s1) {
-          s1[yvel] = -tracker.restitution * s1[yvel];
-        }
-      ),
-      // bounce on back wall
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 0 && (s1[ypos] > 0.9 && s1[yvel] > 0.0);
-        },
-        function(s0, s1) {
-          s1[yvel] = -tracker.restitution * s1[yvel];
-        }
-      ),
-      // bounce on floor
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 0 && (s1[zpos] < 0.0 && s1[zvel] < 0.0);
-        },
-        function(s0, s1) {
-          s1[zvel] = -tracker.restitution * s1[zvel];
-        }
-      ),
-      // bounce on ceiling
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 0 && (s1[zpos] > 0.9 && s1[zvel] > 0.0);
-        },
-        function(s0, s1) {
-          s1[zvel] = -tracker.restitution * s1[zvel];
-        }
-      ),
-      // hard limit on 'floor' keeps z position >= 0;
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 0 && (s1[zpos] < 0.0);
-        },
-        function(s0, s1) {
-          s1[zpos] = 0.0;
-        }
-      ),
-      /* Impulsive Floor Bounce */
-      // bounce on left wall
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 1 && (s1[xpos] < 0.0 && s1[xvel] < 0.0);
-        },
-        function(s0, s1) {
-          s1[xpos] = 0.0;
-          s1[xvel] = Math.abs(s0[xvel]) * tracker.drag * tracker.restitution;
-        }
-      ),
-      // bounce on right wall
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 1 && (s1[xpos] > 0.9 && s1[xvel] > 0.0)
-        },
-        function(s0, s1) {
-          s1[xpos] = 0.9;
-          s1[xvel] = -1 * Math.abs(s0[xvel]) * tracker.drag * tracker.restitution;
-        }
-      ),
-      // bounce on front wall
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 1 && (s1[ypos] < 0.0 && s1[yvel] < 0.0);
-        },
-        function(s0, s1) {
-          s1[ypos] = 0.0;
-          s1[yvel] = Math.abs(s0[yvel]) * tracker.drag * tracker.restitution;
-        }
-      ),
-      // bounce on back wall
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 1 && (s1[ypos] > 0.9 && s1[yvel] > 0.0)
-        },
-        function(s0, s1) {
-          s1[ypos] = 0.9;
-          s1[yvel] = -1 * Math.abs(s0[yvel]) * tracker.drag * tracker.restitution;
-        }
-      ),
-      // bounce on floor
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 1 && (s1[zpos] < 0.0 && s1[zvel] < 0.0)
-        },
-        function(s0, s1) {
-          s1[zpos] = 0.0;
-          s1[zvel] = Math.abs(s0[zvel]) * tracker.drag * tracker.restitution;
-        }
-      ),
-      // bounce on ceiling
-      new Constraint(
-        function(s0, s1) {
-          return tracker.bounce_type == 1 && (s1[zpos] > 0.9 && s1[zvel] > 0.0)
-        },
-        function(s0, s1) {
-          s1[zpos] = 0.9;
-          s1[zvel] = -1 * Math.abs(s0[zvel]) * tracker.drag * tracker.restitution;
-        }
-      )
+      new Constraint(CONSTRAINT_TYPE.VOLUME, [0, 1], 0, 0.9, 0, 0.9, 0, 0.9),
+      // /* Velocity Reverse Floor Bounce */
+      // // bounce on left wall
+      // new Constraint(
+      //   function(s0, s1) {
+      //     return tracker.bounce_type == 0 && (s1[xpos] < 0.0 && s1[xvel] < 0.0);
+      //   },
+      //   function(s0, s1) {
+      //     s1[xvel] = -tracker.restitution * s1[xvel];
+      //   }
+      // ),
+      // // bounce on right wall
+      // new Constraint(
+      //   function(s0, s1) {
+      //     return tracker.bounce_type == 0 && (s1[xpos] > 0.9 && s1[xvel] > 0.0);
+      //   },
+      //   function(s0, s1) {
+      //     s1[xvel] = -tracker.restitution * s1[xvel];
+      //   }
+      // ),
+      // // bounce on front wall
+      // new Constraint(
+      //   function(s0, s1) {
+      //     return tracker.bounce_type == 0 && (s1[ypos] < 0.0 && s1[yvel] < 0.0);
+      //   },
+      //   function(s0, s1) {
+      //     s1[yvel] = -tracker.restitution * s1[yvel];
+      //   }
+      // ),
+      // // bounce on back wall
+      // new Constraint(
+      //   function(s0, s1) {
+      //     return tracker.bounce_type == 0 && (s1[ypos] > 0.9 && s1[yvel] > 0.0);
+      //   },
+      //   function(s0, s1) {
+      //     s1[yvel] = -tracker.restitution * s1[yvel];
+      //   }
+      // ),
+      // // bounce on floor
+      // new Constraint(
+      //   function(s0, s1) {
+      //     return tracker.bounce_type == 0 && (s1[zpos] < 0.0 && s1[zvel] < 0.0);
+      //   },
+      //   function(s0, s1) {
+      //     s1[zvel] = -tracker.restitution * s1[zvel];
+      //   }
+      // ),
+      // // bounce on ceiling
+      // new Constraint(
+      //   function(s0, s1) {
+      //     return tracker.bounce_type == 0 && (s1[zpos] > 0.9 && s1[zvel] > 0.0);
+      //   },
+      //   function(s0, s1) {
+      //     s1[zvel] = -tracker.restitution * s1[zvel];
+      //   }
+      // ),
+      // // hard limit on 'floor' keeps z position >= 0;
+      // new Constraint(
+      //   function(s0, s1) {
+      //     return tracker.bounce_type == 0 && (s1[zpos] < 0.0);
+      //   },
+      //   function(s0, s1) {
+      //     s1[zpos] = 0.0;
+      //   }
+      // ),
     ]
   );
 }
@@ -397,6 +338,7 @@ function initParticleSystems() {
  */
 function updateAll() {
   if (!tracker.pause) {
+    bball.dotFinder();
     bball.solver(tracker.solver);
     bball.doConstraints();
   }

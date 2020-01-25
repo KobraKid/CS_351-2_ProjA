@@ -14,9 +14,9 @@ var GuiTracker = function() {
   this.vel_y = 0;
   this.vel_z = 0;
   this.addVel = function() {
-    bball.addForce(new Force(FORCE_WIND, 1, 0, 0, this.vel_x, TIMEOUT_INSTANT));
-    bball.addForce(new Force(FORCE_WIND, 0, 1, 0, this.vel_y, TIMEOUT_INSTANT));
-    bball.addForce(new Force(FORCE_WIND, 0, 0, 1, this.vel_z, TIMEOUT_INSTANT));
+    bball.addForce(new Force(FORCE_TYPE.FORCE_WIND, 1, 0, 0, this.vel_x, TIMEOUT_INSTANT));
+    bball.addForce(new Force(FORCE_TYPE.FORCE_WIND, 0, 1, 0, this.vel_y, TIMEOUT_INSTANT));
+    bball.addForce(new Force(FORCE_TYPE.FORCE_WIND, 0, 0, 1, this.vel_z, TIMEOUT_INSTANT));
   }
   this.drag = 0.985;
   this.gravity = 9.832;

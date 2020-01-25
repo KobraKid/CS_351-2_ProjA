@@ -17,9 +17,15 @@ var zvel = 5;
  */
 class PartSys {
   constructor(particle_count) {
+    this._particle_count = particle_count;
     this._s0 = new Float32Array(particle_count * STATE_SIZE);
-    this._s0dot = new Float32Array(particle_count * STATE_SIZE);
-    this._s1 = new Float32Array(particle_count * STATE_SIZE);
+    for (var i = 0; i < this._particle_count * STATE_SIZE; i += STATE_SIZE) {
+      this._s0[i + xpos] = Math.random() * 0.9;
+      this._s0[i + ypos] = Math.random() * 0.9;
+      this._s0[i + zpos] = Math.random() * 0.9;
+    }
+    this._s0dot = this._s0.slice();
+    this._s1 = this._s0.slice();
     this._force_set = [];
     this._constraint_set = [];
   }
@@ -92,7 +98,7 @@ class PartSys {
    * Finds the derivative w.r.t. time of state s.
    */
   dotFinder() {
-    this._sdot = this.s1.slice();
+    this._sdot = this.s0.slice();
   }
 
   /**
@@ -101,26 +107,28 @@ class PartSys {
    * @param {number} solver_type The type of solver to use.
    */
   solver(solver_type) {
-    this.s0[xpos] = this.s1[xpos];
-    this.s0[xvel] = this.s1[xvel];
-    this.s0[ypos] = this.s1[ypos];
-    this.s0[yvel] = this.s1[yvel];
-    this.s0[zpos] = this.s1[zpos];
-    this.s0[zvel] = this.s1[zvel];
+    for (var i = 0; i < this._particle_count * STATE_SIZE; i += STATE_SIZE) {
+      this.s0[i + xpos] = this.s1[i + xpos];
+      this.s0[i + xvel] = this.s1[i + xvel];
+      this.s0[i + ypos] = this.s1[i + ypos];
+      this.s0[i + yvel] = this.s1[i + yvel];
+      this.s0[i + zpos] = this.s1[i + zpos];
+      this.s0[i + zvel] = this.s1[i + zvel];
 
-    if (solver_type == 0) { // EXPLICIT (adds energy)
-      this.s1[xpos] += this.s1[xvel] * (timeStep * 0.001);
-      this.s1[ypos] += this.s1[yvel] * (timeStep * 0.001);
-      this.s1[zpos] += this.s1[zvel] * (timeStep * 0.001);
-      this.applyAllForces();
-    } else if (solver_type == 1) { // IMPLICIT (loses energy)
-      this.applyAllForces();
-      this.s1[xpos] += this.s1[xvel] * (timeStep * 0.001);
-      this.s1[ypos] += this.s1[yvel] * (timeStep * 0.001);
-      this.s1[zpos] += this.s1[zvel] * (timeStep * 0.001);
-    } else {
-      console.log('unknown solver: ' + solver_type);
-      return;
+      if (solver_type == 0) { // EXPLICIT (adds energy)
+        this.s1[i + xpos] += this.s1[i + xvel] * (timeStep * 0.001);
+        this.s1[i + ypos] += this.s1[i + yvel] * (timeStep * 0.001);
+        this.s1[i + zpos] += this.s1[i + zvel] * (timeStep * 0.001);
+        this.applyAllForces();
+      } else if (solver_type == 1) { // IMPLICIT (loses energy)
+        this.applyAllForces();
+        this.s1[i + xpos] += this.s1[i + xvel] * (timeStep * 0.001);
+        this.s1[i + ypos] += this.s1[i + yvel] * (timeStep * 0.001);
+        this.s1[i + zpos] += this.s1[i + zvel] * (timeStep * 0.001);
+      } else {
+        console.log('unknown solver: ' + solver_type);
+        return;
+      }
     }
   }
 
@@ -128,6 +136,7 @@ class PartSys {
    * Applies all constraints for a given system.
    */
   doConstraints() {
+    return;
     this.constraint_set.forEach((constraint, _) => {
       constraint.constrain(this.s0, this.s1);
     });
@@ -150,8 +159,8 @@ class PartSys {
    * @param {Float32Array} s0 The previous state vector.
    * @param {Float32Array} s1 The current state vector.
    */
-  swap(s0, s1) {
-    [s0, s1] = [s1, s0];
+  swap() {
+    [this.s0, this.s1] = [this.s1, this.s0];
   }
 
   /**

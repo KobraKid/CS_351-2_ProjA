@@ -122,7 +122,7 @@ function mouseDown(ev) {
     FORCE_TYPE.FORCE_WIND,
     (bball.s1[xvel] >= 0.0) ? 1 : -1,
     (bball.s1[yvel] >= 0.0) ? 1 : -1,
-    (bball.s1[zvel] >= 0.0) ? 0.9 : -0.9,
+    0.9,
     INIT_VEL * Math.random(),
     TIMEOUT_INSTANT));
 }
