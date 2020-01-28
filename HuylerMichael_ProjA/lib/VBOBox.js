@@ -8,7 +8,7 @@
 // where the camera is
 var g_perspective_eye = [6, 0, 1];
 // where the camera is pointing
-var g_perspective_lookat = [0, 0, 0];
+var g_perspective_lookat = [5, 0, 1];
 // the camera's up axis
 var g_perspective_up = [0, 0, 1];
 // rotation step
@@ -27,14 +27,12 @@ class VBOBox {
    * @param {Float32Array} vertex_array An array of vertices to be loaded into the VBO.
    * @param {GLenum} draw_method The mode to be used when calling WebGLRenderingContext.drawArrays().
    * @param {number} attribute_count The number of attributes each vertex has.
-   * @param {number} pos_count The number of attributes used to describe the position vector.
-   * @param {number} norm_count The number of attributes used to describe the normal vector.
-   * @param {number} color_count The number of attributes used to describe the color.
+   * @param {[string: number]} attributes A dictionary of attributes stored in the VBO, where keys are the
+   *        attribute names, and values are how many floats are stared in the VBO for the given attribute.
    * @param {number} box_num The index of this box.
    */
   constructor(VERTEX_SHADER, FRAGMENT_SHADER, vertex_array, draw_method,
-    attribute_count, pos_count, norm_count, color_count, box_num,
-    adjust_function) {
+    attribute_count, attributes, box_num, adjust_function) {
     /* GLSL shader code */
     this.VERTEX_SHADER = VERTEX_SHADER;
     this.FRAGMENT_SHADER = FRAGMENT_SHADER;
@@ -54,23 +52,22 @@ class VBOBox {
     // How to interpret the vertices
     this.draw_method = draw_method;
 
-    /* Attribute metadata */
-    this.vertex_pos_count = pos_count;
-    this.vertex_pos_offset = 0;
-    this.vertex_norm_count = norm_count;
-    this.vertex_norm_offset = this.vertex_pos_count * this.FSIZE;
-    this.vertex_color_count = color_count;
-    this.vertex_color_offset =
-      (this.vertex_pos_count + this.vertex_norm_count) * this.FSIZE;
-
     /* GPU memory locations */
     this.vbo_loc;
     this.shader_loc;
 
-    /* Attribute locations */
-    this.a_position_location;
-    this.a_normal_location;
-    this.a_color_location;
+    /* Attribute metadata */
+    this.attributes = [];
+    var offset = 0;
+    for (var attribute in attributes) {
+      this.attributes.push({
+        name: attribute,
+        count: attributes[attribute],
+        offset: offset,
+        location: ''
+      });
+      offset += attributes[attribute] * this.FSIZE;
+    }
 
     /* Uniform variables and locations */
     this._model_matrix = glMatrix.mat4.create();
@@ -120,6 +117,7 @@ class VBOBox {
    * Initializes a VBOBox, finds GPU locaiton of all variables.
    */
   init() {
+    // Set up shader
     this.shader_loc =
       createProgram(gl, this.VERTEX_SHADER, this.FRAGMENT_SHADER);
     if (!this.shader_loc) {
@@ -138,34 +136,19 @@ class VBOBox {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo_loc);
     gl.bufferData(gl.ARRAY_BUFFER, this.vbo, gl.STATIC_DRAW);
 
-    this.a_position_location =
-      gl.getAttribLocation(this.shader_loc, 'a_position_' + this.box_num);
-    if (this.a_position_location < 0) {
-      console.log(this.constructor.name +
-        '.init() Failed to get GPU location of a_position_' + this.box_num + ' attribute');
-      return;
-    }
-
-    if (this.vertex_norm_count > 0) {
-      this.a_normal_location =
-        gl.getAttribLocation(this.shader_loc, 'a_normal_' + this.box_num);
-      if (this.a_normal_location < 0) {
+    // Set up attributes
+    this.attributes.forEach((attribute, i) => {
+      attribute.location =
+        gl.getAttribLocation(this.shader_loc, attribute.name);
+      if (attribute.locaiton < 0) {
         console.log(this.constructor.name +
-          '.init() failed to get the GPU location of a_normal_' + this.box_num + ' attribute');
+          '.init() Failed to get GPU location of ' +
+          attribute.name);
         return;
       }
-    }
+    });
 
-    if (this.vertex_color_count > 0) {
-      this.a_color_location =
-        gl.getAttribLocation(this.shader_loc, 'a_color_' + this.box_num);
-      if (this.a_color_location < 0) {
-        console.log(this.constructor.name +
-          '.init() failed to get the GPU location of a_color_' + this.box_num + ' attribute');
-        return;
-      }
-    }
-
+    // Set up uniforms
     this.u_model_matrix_loc =
       gl.getUniformLocation(this.shader_loc, 'u_model_matrix_' + this.box_num);
     if (!this.u_model_matrix_loc) {
@@ -193,43 +176,23 @@ class VBOBox {
 
   /**
    * Enables a VBOBox, switching the GPU over to the box's program and enables
-   * the current program's attribute arrays.
+   * the current program's attributes.
    */
   enable() {
     gl.useProgram(this.shader_loc);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo_loc);
-    gl.vertexAttribPointer(
-      this.a_position_location,
-      this.vertex_pos_count,
-      gl.FLOAT,
-      false,
-      this.vbo_stride,
-      this.vertex_pos_offset);
-    if (this.vertex_norm_count > 0) {
+
+    this.attributes.forEach((attribute, _) => {
       gl.vertexAttribPointer(
-        this.a_normal_location,
-        this.vertex_norm_count,
+        attribute.location,
+        attribute.count,
         gl.FLOAT,
         false,
         this.vbo_stride,
-        this.vertex_norm_offset);
-    }
-    if (this.vertex_color_count > 0) {
-      gl.vertexAttribPointer(
-        this.a_color_location,
-        this.vertex_color_count,
-        gl.FLOAT,
-        false,
-        this.vbo_stride,
-        this.vertex_color_offset);
-    }
-    gl.enableVertexAttribArray(this.a_position_location);
-    if (this.vertex_norm_count > 0) {
-      gl.enableVertexAttribArray(this.a_normal_location);
-    }
-    if (this.vertex_color_count > 0) {
-      gl.enableVertexAttribArray(this.a_color_location);
-    }
+        attribute.offset
+      );
+      gl.enableVertexAttribArray(attribute.location);
+    });
   }
 
   /**
@@ -284,7 +247,7 @@ class VBOBox {
    * Useful if independent vertices should move. Modifications to this VBOBox's
    * vbo array will be substituted into the GPU's VBO.
    */
-  reload() {
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vbo);
+  reload(data, index = 0) {
+    gl.bufferSubData(gl.ARRAY_BUFFER, index, data);
   }
 }

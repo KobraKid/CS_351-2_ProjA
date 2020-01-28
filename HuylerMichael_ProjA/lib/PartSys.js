@@ -152,7 +152,7 @@ class PartSys {
   render(box) {
     // Send to the VBO box to call WebGLRenderingContext.bufferSubData()
     box.vbo = this.s1;
-    box.reload();
+    box.reload(box.vbo);
   }
 
   /**
@@ -264,9 +264,9 @@ class Force {
         break;
       case FORCE_TYPE.FORCE_WIND:
         for (var i = 0; i < s.length; i += STATE_SIZE) {
-          s[i + xvel] += this.x * this.magnitude;
-          s[i + yvel] += this.y * this.magnitude;
-          s[i + zvel] += this.z * this.magnitude;
+          s[i + xvel] += this.x * this.magnitude * Math.random();
+          s[i + yvel] += this.y * this.magnitude * Math.random();
+          s[i + zvel] += this.z * this.magnitude * Math.random();
         }
         break;
       default:
@@ -337,6 +337,26 @@ class Constraint {
         break;
     }
     this._p = affected_particles;
+    this.draw(0, true);
+  }
+
+  set x_min(x) {
+    this._x_min = x;
+  }
+  set x_max(x) {
+    this._x_max = x;
+  }
+  set y_min(y) {
+    this._y_min = y;
+  }
+  set y_max(y) {
+    this._y_max = y;
+  }
+  set z_min(z) {
+    this._z_min = z;
+  }
+  set z_max(z) {
+    this._z_max = z;
   }
 
   /**
@@ -418,5 +438,50 @@ class Constraint {
       default:
         return;
     }
+  }
+
+  draw(index, enabled) {
+    var r = Math.random();
+    var g = Math.random();
+    var b = Math.random();
+    vbo_2.reload(
+      new Float32Array([
+        this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
+        this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
+
+        this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
+        this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
+
+        this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
+        this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
+
+        this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
+        this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
+
+        this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
+        this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
+
+        this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
+        this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
+
+        this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
+        this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
+
+        this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
+        this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
+
+        this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
+        this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
+
+        this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
+        this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
+
+        this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
+        this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
+
+        this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
+        this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
+      ]),
+      index);
   }
 }

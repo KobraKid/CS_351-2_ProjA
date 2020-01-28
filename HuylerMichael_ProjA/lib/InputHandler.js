@@ -120,9 +120,9 @@ function mouseDown(ev) {
   // Pop the ball up
   bball.addForce(new Force(
     FORCE_TYPE.FORCE_WIND,
-    (bball.s1[xvel] >= 0.0) ? 1 : -1,
-    (bball.s1[yvel] >= 0.0) ? 1 : -1,
-    0.9,
+    (bball.s1[xvel] >= 0.0) ? 2 : -2,
+    (bball.s1[yvel] >= 0.0) ? 2 : -2,
+    (bball.s1[yvel] >= 0.0) ? 2 : -2,
     INIT_VEL * Math.random(),
     TIMEOUT_INSTANT));
 }

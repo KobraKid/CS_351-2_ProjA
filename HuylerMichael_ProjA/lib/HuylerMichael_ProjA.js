@@ -28,7 +28,7 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var PARTICLE_COUNT = 20;
+var PARTICLE_COUNT = 100;
 var bball = new PartSys(PARTICLE_COUNT);
 
 /**
@@ -64,8 +64,8 @@ function main() {
   window.addEventListener("keydown", keyDown, false);
 
   initGui();
-  initParticleSystems();
   initVBOBoxes();
+  initParticleSystems();
 
   var tick = function() {
     requestAnimationFrame(tick, canvas);
@@ -146,7 +146,17 @@ function initVBOBoxes() {
     verts[i + 5] = 40.0 / 255;
     verts[i + 6] = 80.0 / 255;
   }
-  vbo_0 = new VBOBox(vertex_shader_0, fragment_shader_0, verts, gl.LINES, 7, 4, 0, 3, 0, () => {});
+  vbo_0 = new VBOBox(
+    vertex_shader_0,
+    fragment_shader_0,
+    verts,
+    gl.LINES,
+    7, {
+      'a_position_0': 4,
+      'a_color_0': 3
+    },
+    0,
+    () => {});
   vbo_0.init();
   vbo_boxes.push(vbo_0);
 
@@ -178,10 +188,19 @@ function initVBOBoxes() {
         gl_FragColor = vec4((1.0 - 2.0 * dist) * v_color_1.rgb, 1.0);
       } else { discard; }
     }`;
-  vbo_1 = new VBOBox(vertex_shader_1, fragment_shader_1, new Float32Array(PARTICLE_COUNT * STATE_SIZE), gl.POINTS, STATE_SIZE, 3, 0, 0, 1, () => {
-    bball.render(vbo_1);
-    bball.swap();
-  });
+  vbo_1 = new VBOBox(
+    vertex_shader_1,
+    fragment_shader_1,
+    new Float32Array(PARTICLE_COUNT * STATE_SIZE),
+    gl.POINTS,
+    STATE_SIZE, {
+      'a_position_1': 3
+    },
+    1,
+    () => {
+      bball.render(vbo_1);
+      bball.swap();
+    });
   vbo_1.init();
   vbo_boxes.push(vbo_1);
 
@@ -194,60 +213,39 @@ function initVBOBoxes() {
 
     attribute vec3 a_position_2;
     attribute vec3 a_color_2;
+    attribute float a_enabled_2;
 
     varying vec3 v_color_2;
+    varying float v_enabled_2;
 
     void main() {
       gl_Position = u_projection_matrix_2 * u_view_matrix_2 * u_model_matrix_2 * vec4(a_position_2, 1.0);
       v_color_2 = a_color_2;
+      v_enabled_2 = a_enabled_2;
     }`;
   var fragment_shader_2 =
     `precision mediump float;
 
     varying vec3 v_color_2;
+    varying float v_enabled_2;
 
     void main() {
-      gl_FragColor = vec4(v_color_2, 1.0);
+      if (v_enabled_2 > 0.0) {
+        gl_FragColor = vec4(v_color_2, 1.0);
+      } else { discard; }
     }`;
-  vbo_2 = new VBOBox(vertex_shader_2, fragment_shader_2, new Float32Array([
-      0, 0, 0, 0, 0, 0,
-      0.9, 0, 0, 0, 0, 0,
-
-      0, 0, 0, 0, 0, 0,
-      0, 0.9, 0, 0, 0, 0,
-
-      0, 0, 0, 0, 0, 0,
-      0, 0, 0.9, 0, 0, 0,
-
-      0.9, 0, 0, 0, 0, 0,
-      0.9, 0, 0.9, 0, 0, 0,
-
-      0.9, 0, 0, 0, 0, 0,
-      0.9, 0.9, 0, 0, 0, 0,
-
-      0, 0.9, 0, 0, 0, 0,
-      0, 0.9, 0.9, 0, 0, 0,
-
-      0, 0.9, 0, 0, 0, 0,
-      0.9, 0.9, 0, 0, 0, 0,
-
-      0.9, 0.9, 0, 0, 0, 0,
-      0.9, 0.9, 0.9, 0, 0, 0,
-
-      0, 0, 0.9, 0, 0, 0,
-      0.9, 0, 0.9, 0, 0, 0,
-
-      0, 0, 0.9, 0, 0, 0,
-      0, 0.9, 0.9, 0, 0, 0,
-
-      0.9, 0, 0.9, 0, 0, 0,
-      0.9, 0.9, 0.9, 0, 0, 0,
-
-      0, 0.9, 0.9, 0, 0, 0,
-      0.9, 0.9, 0.9, 0, 0, 0,
-
-    ]),
-    gl.LINES, 6, 3, 0, 3, 2, () => {});
+  vbo_2 = new VBOBox(
+    vertex_shader_2,
+    fragment_shader_2,
+    new Float32Array(7 * 24 * 1), // 7 attributes, 12 lines, 4 constraints
+    gl.LINES,
+    7, {
+      'a_position_2': 3,
+      'a_color_2': 3,
+      'a_enabled_2': 1
+    },
+    2,
+    () => {});
   vbo_2.init();
   vbo_boxes.push(vbo_2);
 }
@@ -264,7 +262,7 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, [...Array(PARTICLE_COUNT).keys()], 0, 0.9, 0, 0.9, 0, 0.9),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, [...Array(PARTICLE_COUNT).keys()], -1, 1, -1, 1, 0, 2),
     ]
   );
 }
@@ -284,7 +282,7 @@ function updateAll() {
  * Draws all of the VBOBoxes.
  */
 function drawAll() {
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  if (tracker.clear) gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   vbo_boxes.forEach((box, _) => {
     box.enable();
