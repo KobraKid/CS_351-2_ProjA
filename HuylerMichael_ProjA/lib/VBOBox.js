@@ -217,7 +217,7 @@ class VBOBox {
    */
   adjust() {
     this.custom_adjust();
-    glMatrix.mat4.perspective(this.projection_matrix, 30 * aspect, aspect, 1, 100);
+    glMatrix.mat4.perspective(this.projection_matrix, 30 * Math.PI / 180, aspect, 1, 100);
     glMatrix.mat4.lookAt(
       this.view_matrix,
       glMatrix.vec3.fromValues(g_perspective_eye[0], g_perspective_eye[1], g_perspective_eye[2]),
@@ -248,6 +248,6 @@ class VBOBox {
    * vbo array will be substituted into the GPU's VBO.
    */
   reload(data, index = 0) {
-    gl.bufferSubData(gl.ARRAY_BUFFER, index, data);
+    gl.bufferSubData(gl.ARRAY_BUFFER, index * this.FSIZE, data);
   }
 }

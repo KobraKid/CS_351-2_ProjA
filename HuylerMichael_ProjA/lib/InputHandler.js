@@ -110,6 +110,18 @@ function keyDown(kev) {
       g_perspective_lookat[0] = g_perspective_eye[0] + Math.cos(theta);
       g_perspective_lookat[1] = g_perspective_eye[1] + Math.sin(theta);
       break;
+    case "Space":
+    for (var i = 0; i < PARTICLE_COUNT; i++) {
+      bball.addForce(new Force(
+        FORCE_TYPE.FORCE_WIND,
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1,
+        Math.random() * 2,
+        INIT_VEL * Math.random(),
+        TIMEOUT_INSTANT,
+        [i]));
+      }
+      break;
     default:
       console.log("Unused key: " + code);
       break;
@@ -117,14 +129,7 @@ function keyDown(kev) {
 }
 
 function mouseDown(ev) {
-  // Pop the ball up
-  bball.addForce(new Force(
-    FORCE_TYPE.FORCE_WIND,
-    (bball.s1[xvel] >= 0.0) ? 2 : -2,
-    (bball.s1[yvel] >= 0.0) ? 2 : -2,
-    (bball.s1[yvel] >= 0.0) ? 2 : -2,
-    INIT_VEL * Math.random(),
-    TIMEOUT_INSTANT));
+
 }
 
 function mouseUp(ev) {

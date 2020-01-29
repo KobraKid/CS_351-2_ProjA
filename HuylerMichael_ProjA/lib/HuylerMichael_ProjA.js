@@ -28,7 +28,7 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var PARTICLE_COUNT = 100;
+var PARTICLE_COUNT = 10;
 var bball = new PartSys(PARTICLE_COUNT);
 
 /**
@@ -142,8 +142,8 @@ function initVBOBoxes() {
     }
   }
   for (var i = 0; i < verts.length; i += 7) {
-    verts[i + 4] = 0.0 / 255;
-    verts[i + 5] = 40.0 / 255;
+    verts[i + 4] = 80.0 / 255;
+    verts[i + 5] = 80.0 / 255;
     verts[i + 6] = 80.0 / 255;
   }
   vbo_0 = new VBOBox(
@@ -172,7 +172,7 @@ function initVBOBoxes() {
     varying vec4 v_color_1;
 
     void main() {
-      gl_PointSize = 20.0;
+      gl_PointSize = 16.0;
       gl_Position = u_projection_matrix_1 * u_view_matrix_1 * u_model_matrix_1 * a_position_1;
       v_color_1 = vec4(0.2, 1.0, 0.2, 1.0);
     }`;
@@ -237,7 +237,7 @@ function initVBOBoxes() {
   vbo_2 = new VBOBox(
     vertex_shader_2,
     fragment_shader_2,
-    new Float32Array(7 * 24 * 1), // 7 attributes, 12 lines, 4 constraints
+    new Float32Array(7 * 24 * 4), // 7 attributes, 12 lines, 4 constraints
     gl.LINES,
     7, {
       'a_position_2': 3,
@@ -254,17 +254,21 @@ function initVBOBoxes() {
  * Initializes all of the particle systems.
  */
 function initParticleSystems() {
+  particles = [...Array(PARTICLE_COUNT).keys()];
   bball.init(0,
     [
       // gravity
-      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, 0, 0, 1, -tracker.gravity * (timeStep * 0.001), TIMEOUT_NO_TIMEOUT),
+      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, 0, 0, 1, -tracker.gravity * (timeStep * 0.001), TIMEOUT_NO_TIMEOUT, particles),
       // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT),
+      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT, particles),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, [...Array(PARTICLE_COUNT).keys()], -1, 1, -1, 1, 0, 2),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(PARTICLE_COUNT / 2, PARTICLE_COUNT), -1, 1, -1, 1, 1, 2),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(0, PARTICLE_COUNT / 2), -0.9, 0.9, -0.9, 0.9, 0, 1),
     ]
   );
+  bball.constraint_set[0].draw(0, true);
+  bball.constraint_set[1].draw(1, true);
 }
 
 /**
