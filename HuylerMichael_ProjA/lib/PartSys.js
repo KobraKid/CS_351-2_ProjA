@@ -4,14 +4,24 @@
  * @author Michael Huyler
  */
 
-var STATE_SIZE = 7;
-var xpos = 0;
-var ypos = 1;
-var zpos = 2;
-var xvel = 3;
-var yvel = 4;
-var zvel = 5;
-var age = 6;
+const STATE_SIZE = 14;
+const STATE = {
+  P_X: 0,
+  P_Y: 1,
+  P_Z: 2,
+  V_X: 3,
+  V_Y: 4,
+  V_Z: 5,
+  F_X: 6,
+  F_Y: 7,
+  F_Z: 8,
+  R: 9,
+  G: 10,
+  B: 11,
+  MASS: 12,
+  DIAMETER: 13,
+  AGE: 14,
+};
 
 /**
  * Abstract Particle System.
@@ -19,21 +29,24 @@ var age = 6;
 class PartSys {
   constructor(particle_count) {
     this._particle_count = particle_count;
-    this._s0 = new Float32Array(particle_count * STATE_SIZE);
-    this._s0dot = this._s0.slice();
-    this._s1 = this._s0.slice();
+    this._s1 = new Float32Array(particle_count * STATE_SIZE);
+    for (var i = 0; i < particle_count * STATE_SIZE; i += STATE_SIZE) {
+      this._s1[i + STATE.MASS] = 1;
+    }
+    this._s1dot = this._s1.slice();
+    this._s2 = this._s1.slice();
     this._force_set = [];
     this._constraint_set = [];
   }
 
-  get s0() {
-    return this._s0;
-  }
-  get s0dot() {
-    return this._s0dot;
-  }
   get s1() {
     return this._s1;
+  }
+  get s1dot() {
+    return this._s1dot;
+  }
+  get s2() {
+    return this._s2;
   }
   get force_set() {
     return this._force_set;
@@ -42,14 +55,14 @@ class PartSys {
     return this._constraint_set;
   }
 
-  set s0(s) {
-    this._s0 = s;
-  }
-  set s0dot(s) {
-    this._s0dot = s;
-  }
   set s1(s) {
     this._s1 = s;
+  }
+  set s1dot(s) {
+    this._s1dot = s;
+  }
+  set s2(s) {
+    this._s2 = s;
   }
   set force_set(f) {
     if (f instanceof Force) {
@@ -85,45 +98,68 @@ class PartSys {
   /**
    * Applys all forces in forceArray, modifying state array s.
    */
-  applyAllForces() {
-    this.force_set.forEach((force, _) => force.apply(this.s1));
+  applyAllForces(s) {
+    for (var i = 0; i < s.length; i += STATE_SIZE) {
+      s[i + STATE.F_X] = 0;
+      s[i + STATE.F_Y] = 0;
+      s[i + STATE.F_Z] = 0;
+    }
+    this.force_set.forEach((force, _) => force.apply(s));
     this.force_set = this.force_set.filter(force => !force.expired());
   }
 
   /**
    * Finds the derivative w.r.t. time of state s.
    */
-  dotFinder() {
-    this._sdot = this.s1.slice();
+  dotFinder(s) {
+    var dot = s.slice();
+    var inverse_mass = 0;
+    for (var i = 0; i < s.length; i += STATE_SIZE) {
+      inverse_mass = 1.0 / s[i + STATE.MASS];
+      dot[i + STATE.P_X] = s[i + STATE.V_X];
+      dot[i + STATE.P_Y] = s[i + STATE.V_Y];
+      dot[i + STATE.P_Z] = s[i + STATE.V_Z];
+      dot[i + STATE.V_X] = s[i + STATE.F_X] * inverse_mass;
+      dot[i + STATE.V_Y] = s[i + STATE.F_Y] * inverse_mass;
+      dot[i + STATE.V_Z] = s[i + STATE.F_Z] * inverse_mass;
+      dot[i + STATE.F_X] = 0;
+      dot[i + STATE.F_Y] = 0;
+      dot[i + STATE.F_Z] = 0;
+      dot[i + STATE.R] = 0;
+      dot[i + STATE.G] = 0;
+      dot[i + STATE.B] = 0;
+      dot[i + STATE.MASS] = 0;
+      dot[i + STATE.DIAMETER] = 0;
+      dot[i + STATE.AGE] = 0;
+    }
+    return dot;
   }
 
   /**
-   * Creates s1 by approximating integration of s0 over a single timestep.
+   * Creates s2 by approximating integration of s1 over a single timestep.
    *
    * @param {number} solver_type The type of solver to use.
    */
   solver(solver_type) {
-    for (var i = 0; i < this.s1.length; i += STATE_SIZE) {
-      this.s0[i + xpos] = this.s1[i + xpos];
-      this.s0[i + xvel] = this.s1[i + xvel];
-      this.s0[i + ypos] = this.s1[i + ypos];
-      this.s0[i + yvel] = this.s1[i + yvel];
-      this.s0[i + zpos] = this.s1[i + zpos];
-      this.s0[i + zvel] = this.s1[i + zvel];
+    for (var i = 0; i < this.s2.length; i += STATE_SIZE) {
+      this.s1[i + STATE.P_X] = this.s2[i + STATE.P_X];
+      this.s1[i + STATE.V_X] = this.s2[i + STATE.V_X];
+      this.s1[i + STATE.P_Y] = this.s2[i + STATE.P_Y];
+      this.s1[i + STATE.V_Y] = this.s2[i + STATE.V_Y];
+      this.s1[i + STATE.P_Z] = this.s2[i + STATE.P_Z];
+      this.s1[i + STATE.V_Z] = this.s2[i + STATE.V_Z];
     }
     if (solver_type == 0) { // EXPLICIT (adds energy)
-      for (var i = 0; i < this.s1.length; i += STATE_SIZE) {
-        this.s1[i + xpos] += this.s1[i + xvel] * (timeStep * 0.001);
-        this.s1[i + ypos] += this.s1[i + yvel] * (timeStep * 0.001);
-        this.s1[i + zpos] += this.s1[i + zvel] * (timeStep * 0.001);
+      for (var i = 0; i < this.s2.length; i ++) {
+        this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
+        // this.s2[i + STATE.P_X] += this.s2[i + STATE.V_X] * (timeStep * 0.001);
+        // this.s2[i + STATE.P_Y] += this.s2[i + STATE.V_Y] * (timeStep * 0.001);
+        // this.s2[i + STATE.P_Z] += this.s2[i + STATE.V_Z] * (timeStep * 0.001);
       }
-      this.applyAllForces();
+      // this.applyAllForces();
     } else if (solver_type == 1) { // IMPLICIT (loses energy)
-      this.applyAllForces();
-      for (var i = 0; i < this.s1.length; i += STATE_SIZE) {
-        this.s1[i + xpos] += this.s1[i + xvel] * (timeStep * 0.001);
-        this.s1[i + ypos] += this.s1[i + yvel] * (timeStep * 0.001);
-        this.s1[i + zpos] += this.s1[i + zvel] * (timeStep * 0.001);
+      for (var i = 0; i < this.s2.length; i ++) {
+        this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
       }
     } else {
       console.log('unknown solver: ' + solver_type);
@@ -136,8 +172,22 @@ class PartSys {
    */
   doConstraints() {
     this.constraint_set.forEach((constraint, _) => {
-      constraint.constrain(this.s0, this.s1);
+      constraint.constrain(this.s1, this.s2);
     });
+    if (tracker.fountain) {
+      for (var i = 0; i < this.s2.length; i += STATE_SIZE) {
+        this.s2[i + STATE.AGE] -= 1;
+        if (this.s2[i + STATE.AGE] <= 0) {
+          this.s2[i + STATE.P_X] = 0.2 * Math.random() - 0.1;
+          this.s2[i + STATE.P_Y] = 0.2 * Math.random() - 0.1;
+          this.s2[i + STATE.P_Z] = 0.4 * Math.random();
+          this.s2[i + STATE.V_X] = 0.8 * Math.random() - 0.4;
+          this.s2[i + STATE.V_Y] = 0.8 * Math.random() - 0.4;
+          this.s2[i + STATE.V_Z] = 3.0 * Math.random();
+          this.s2[i + STATE.AGE] = 30 + 30 * Math.random();
+        }
+      }
+    }
   }
 
   /**
@@ -147,18 +197,18 @@ class PartSys {
    */
   render(box) {
     // Send to the VBO box to call WebGLRenderingContext.bufferSubData()
-    box.vbo = this.s1;
+    box.vbo = this.s2;
     box.reload(box.vbo);
   }
 
   /**
    * Swaps two state vectors.
    *
-   * @param {Float32Array} s0 The previous state vector.
-   * @param {Float32Array} s1 The current state vector.
+   * @param {Float32Array} s1 The previous state vector.
+   * @param {Float32Array} s2 The current state vector.
    */
-  swap(s0, s1) {
-    [s0, s1] = [s1, s0];
+  swap(s1, s2) {
+    [s1, s2] = [s2, s1];
   }
 
   /**
@@ -199,7 +249,7 @@ const FORCE_TYPE = {
   FORCE_CHARGE: 4,
   FORCE_FLOCK: 5,
   FORCE_GRAVITY: 6,
-}
+};
 
 // How long the force should stay active
 var TIMEOUT_NO_TIMEOUT = -1;
@@ -249,21 +299,21 @@ class Force {
     switch (this._type) {
       case FORCE_TYPE.FORCE_SIMP_GRAVITY:
         for (var i = 0; i < this._p.length; i++) {
-          s[(this._p[i] * STATE_SIZE) + zvel] += this.magnitude;
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += s[(this._p[i] * STATE_SIZE) + STATE.MASS] * this.magnitude;
         }
         break;
       case FORCE_TYPE.FORCE_DRAG:
         for (var i = 0; i < this._p.length; i++) {
-          s[(this._p[i] * STATE_SIZE) + xvel] *= (this.x * this.magnitude);
-          s[(this._p[i] * STATE_SIZE) + yvel] *= (this.y * this.magnitude);
-          s[(this._p[i] * STATE_SIZE) + zvel] *= (this.z * this.magnitude);
+          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += s[(this._p[i] * STATE_SIZE) + STATE.V_X] * (this.x * this.magnitude);
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += s[(this._p[i] * STATE_SIZE) + STATE.V_Y] * (this.y * this.magnitude);
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += s[(this._p[i] * STATE_SIZE) + STATE.V_Z] * (this.z * this.magnitude);
         }
         break;
       case FORCE_TYPE.FORCE_WIND:
         for (var i = 0; i < this._p.length; i++) {
-          s[(this._p[i] * STATE_SIZE) + xvel] += this.x * this.magnitude * Math.random();
-          s[(this._p[i] * STATE_SIZE) + yvel] += this.y * this.magnitude * Math.random();
-          s[(this._p[i] * STATE_SIZE) + zvel] += this.z * this.magnitude * Math.random();
+          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += this.x * this.magnitude * Math.random();
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += this.y * this.magnitude * Math.random();
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += this.z * this.magnitude * Math.random();
         }
         break;
       default:
@@ -301,7 +351,17 @@ const CONSTRAINT_TYPE = {
   VOLUME_VELOCITY_REVERSE: 1,
   SPHERE: 2,
   STIFF_SPRING: 3,
-}
+};
+
+const WALL = {
+  ALL: 0b111111,
+  TOP: 0b000001,
+  BOTTOM: 0b000010,
+  FRONT: 0b000100,
+  BACK: 0b001000,
+  LEFT: 0b010000,
+  RIGHT: 0b100000,
+};
 
 /**
  * Creates rules for a constraint, and a function to be called to fix the
@@ -309,12 +369,12 @@ const CONSTRAINT_TYPE = {
  */
 class Constraint {
   /**
-   * @param {function(Float32Array, Float32Array): boolean} predicate The
-   *    predicate used to test whether this constraint has been met.
-   * @param {function(Float32Array, Float32Array): undefined} fix The function
-   *    used to repair the state vector.
+   * @param {CONSTRAINT_TYPE} type The type of constraint to represent.
+   * @param {Array<number>} affected_particles The list of particles to constrain.
+   * @param {WALL} enabled_walls The walls to enable for this constraint.
+   * @param {...number} bounds The rest of the arguments are all numbers which bound the constraint.
    */
-  constructor(type, affected_particles, ...bounds) {
+  constructor(type, affected_particles, enabled_walls, ...bounds) {
     this._type = type;
     switch (this._type) {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
@@ -340,6 +400,7 @@ class Constraint {
         break;
     }
     this._p = affected_particles;
+    this._walls = enabled_walls;
   }
 
   set x_min(x) {
@@ -364,42 +425,59 @@ class Constraint {
   /**
    * Ensures the current state vector meets this constraint.
    *
-   * @param {Float32Array} s0 The previous state vector.
-   * @param {Float32Array} s1 The current state vector.
+   * @param {Float32Array} s1 The previous state vector.
+   * @param {Float32Array} s2 The current state vector.
    */
-  constrain(s0, s1) {
+  constrain(s1, s2) {
     switch (this._type) {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
         for (var i = 0; i < this._p.length; i++) {
           // bounce on left wall
-          if (s1[(this._p[i] * STATE_SIZE) + xpos] < this._x_min && s1[(this._p[i] * STATE_SIZE) + xvel] < 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + xpos] = this._x_min;
-            s1[(this._p[i] * STATE_SIZE) + xvel] = Math.abs(s0[(this._p[i] * STATE_SIZE) + xvel]) * tracker.drag * tracker.restitution;
+          if ((this._walls & WALL.LEFT) &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_X] < this._x_min &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] < 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x_min;
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] =
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_X]) * tracker.drag * tracker.restitution;
           }
           // bounce on right wall
-          if (s1[(this._p[i] * STATE_SIZE) + xpos] > this._x_max && s1[(this._p[i] * STATE_SIZE) + xvel] > 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + xpos] = this._x_max;
-            s1[(this._p[i] * STATE_SIZE) + xvel] = -1 * Math.abs(s0[(this._p[i] * STATE_SIZE) + xvel]) * tracker.drag * tracker.restitution;
+          if ((this._walls & WALL.RIGHT) &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_X] > this._x_max &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] > 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x_max;
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_X]) * tracker.drag * tracker.restitution * -1;
           }
           // bounce on front wall
-          if (s1[(this._p[i] * STATE_SIZE) + ypos] < this._y_min && s1[(this._p[i] * STATE_SIZE) + yvel] < 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + ypos] = this._y_min;
-            s1[(this._p[i] * STATE_SIZE) + yvel] = Math.abs(s0[(this._p[i] * STATE_SIZE) + yvel]) * tracker.drag * tracker.restitution;
+          if ((this._walls & WALL.FRONT) &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] < this._y_min &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] < 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y_min;
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] =
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Y]) * tracker.drag * tracker.restitution;
           }
           // bounce on back wall
-          if (s1[(this._p[i] * STATE_SIZE) + ypos] > this._y_max && s1[(this._p[i] * STATE_SIZE) + yvel] > 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + ypos] = this._y_max;
-            s1[(this._p[i] * STATE_SIZE) + yvel] = -1 * Math.abs(s0[(this._p[i] * STATE_SIZE) + yvel]) * tracker.drag * tracker.restitution;
+          if ((this._walls & WALL.BACK) &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] > this._y_max &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] > 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y_max;
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] =
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Y]) * tracker.drag * tracker.restitution * -1;
           }
           // bounce on floor
-          if (s1[(this._p[i] * STATE_SIZE) + zpos] < this._z_min && s1[(this._p[i] * STATE_SIZE) + zvel] < 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + zpos] = this._z_min;
-            s1[(this._p[i] * STATE_SIZE) + zvel] = Math.abs(s0[(this._p[i] * STATE_SIZE) + zvel]) * tracker.drag * tracker.restitution;
+          if ((this._walls & WALL.BOTTOM) &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] < this._z_min &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] < 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_min;
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] =
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Z]) * tracker.drag * tracker.restitution;
           }
           // bounce on ceiling
-          if (s1[(this._p[i] * STATE_SIZE) + zpos] > this._z_max && s1[(this._p[i] * STATE_SIZE) + zvel] > 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + zpos] = this._z_max;
-            s1[(this._p[i] * STATE_SIZE) + zvel] = -1 * Math.abs(s0[(this._p[i] * STATE_SIZE) + zvel]) * tracker.drag * tracker.restitution;
+          if ((this._walls & WALL.TOP) &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] > this._z_max &&
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] > 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_max;
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] =
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Z]) * tracker.drag * tracker.restitution * -1;
           }
 
         }
@@ -407,32 +485,32 @@ class Constraint {
       case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
         for (var i = 0; i < this._p.length; i++) {
           // bounce on left wall
-          if (s1[(this._p[i] * STATE_SIZE) + xpos] < this._x_min && s1[(this._p[i] * STATE_SIZE) + xvel] < 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + xvel] = -tracker.restitution * s1[(this._p[i] * STATE_SIZE) + xvel];
+          if (s2[(this._p[i] * STATE_SIZE) + STATE.P_X] < this._x_min && s2[(this._p[i] * STATE_SIZE) + STATE.V_X] < 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_X];
           }
           // bounce on right wall
-          if (s1[(this._p[i] * STATE_SIZE) + xpos] > this._x_max && s1[(this._p[i] * STATE_SIZE) + xvel] > 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + xvel] = -tracker.restitution * s1[(this._p[i] * STATE_SIZE) + xvel];
+          if (s2[(this._p[i] * STATE_SIZE) + STATE.P_X] > this._x_max && s2[(this._p[i] * STATE_SIZE) + STATE.V_X] > 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_X];
           }
           // bounce on front wall
-          if (s1[(this._p[i] * STATE_SIZE) + ypos] < this._y_min && s1[(this._p[i] * STATE_SIZE) + yvel] < 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + yvel] = -tracker.restitution * s1[(this._p[i] * STATE_SIZE) + yvel];
+          if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] < this._y_min && s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] < 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Y];
           }
           // bounce on back wall
-          if (s1[(this._p[i] * STATE_SIZE) + ypos] > this._y_max && s1[(this._p[i] * STATE_SIZE) + yvel] > 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + yvel] = -tracker.restitution * s1[(this._p[i] * STATE_SIZE) + yvel];
+          if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] > this._y_max && s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] > 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Y];
           }
           // bounce on floor
-          if (s1[(this._p[i] * STATE_SIZE) + zpos] < this._z_min && s1[(this._p[i] * STATE_SIZE) + zvel] < 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + zvel] = -tracker.restitution * s1[(this._p[i] * STATE_SIZE) + zvel];
+          if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] < this._z_min && s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] < 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Z];
           }
           // bounce on ceiling
-          if (s1[(this._p[i] * STATE_SIZE) + zpos] > this._z_max && s1[(this._p[i] * STATE_SIZE) + zvel] > 0.0) {
-            s1[(this._p[i] * STATE_SIZE) + zvel] = -tracker.restitution * s1[(this._p[i] * STATE_SIZE) + zvel];
+          if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] > this._z_max && s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] > 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Z];
           }
           // hard limit on 'floor' keeps z position >= 0;
-          if (s1[(this._p[i] * STATE_SIZE) + zpos] < this._z_min) {
-            s1[(this._p[i] * STATE_SIZE) + zpos] = this._z_min;
+          if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] < this._z_min) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_min;
           }
         }
         break;
@@ -440,10 +518,10 @@ class Constraint {
         break;
       case CONSTRAINT_TYPE.STIFF_SPRING:
         if (Math.sqrt(
-          Math.pow(s1[this._p[0] + xpos] + s1[this._p[0] + xvel] - s1[this._p[1] + xpos] + s1[this._p[1] + xvel], 2) +
-          Math.pow(s1[this._p[0] + ypos] + s1[this._p[0] + yvel] - s1[this._p[1] + ypos] + s1[this._p[1] + yvel], 2) +
-          Math.pow(s1[this._p[0] + zpos] + s1[this._p[0] + zvel] - s1[this._p[1] + zpos] + s1[this._p[1] + zvel], 2)
-        ) > 0.5) {
+            Math.pow(s2[this._p[0] + STATE.P_X] + s2[this._p[0] + STATE.V_X] - s2[this._p[1] + STATE.P_X] + s2[this._p[1] + STATE.V_X], 2) +
+            Math.pow(s2[this._p[0] + STATE.P_Y] + s2[this._p[0] + STATE.V_Y] - s2[this._p[1] + STATE.P_Y] + s2[this._p[1] + STATE.V_Y], 2) +
+            Math.pow(s2[this._p[0] + STATE.P_Z] + s2[this._p[0] + STATE.V_Z] - s2[this._p[1] + STATE.P_Z] + s2[this._p[1] + STATE.V_Z], 2)
+          ) > 0.5) {
           console.log('breaking');
         }
         break;

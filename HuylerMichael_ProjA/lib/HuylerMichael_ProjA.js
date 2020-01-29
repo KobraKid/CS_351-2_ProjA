@@ -28,7 +28,7 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var PARTICLE_COUNT = 10;
+var PARTICLE_COUNT = 1000;
 var bball = new PartSys(PARTICLE_COUNT);
 
 /**
@@ -198,8 +198,14 @@ function initVBOBoxes() {
     },
     1,
     () => {
-      bball.render(vbo_1);
-      bball.swap();
+      if (!tracker.pause) {
+        bball.applyAllForces(bball.s1);
+        bball.s1dot = bball.dotFinder(bball.s2);
+        bball.solver(tracker.solver);
+        bball.doConstraints();
+        bball.render(vbo_1);
+        bball.swap();
+      }
     });
   vbo_1.init();
   vbo_boxes.push(vbo_1);
@@ -263,8 +269,8 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT, particles),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(PARTICLE_COUNT / 2, PARTICLE_COUNT), -1, 1, -1, 1, 1, 2),
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(0, PARTICLE_COUNT / 2), -0.9, 0.9, -0.9, 0.9, 0, 1),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(PARTICLE_COUNT / 2, PARTICLE_COUNT), WALL.ALL, -1, 1, -1, 1, 1, 2),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(0, PARTICLE_COUNT / 2), WALL.ALL, -0.9, 0.9, -0.9, 0.9, 0, 1),
     ]
   );
   bball.constraint_set[0].draw(0, true);
@@ -275,11 +281,7 @@ function initParticleSystems() {
  * Updates all of the Particle Systems.
  */
 function updateAll() {
-  if (!tracker.pause) {
-    bball.dotFinder();
-    bball.solver(tracker.solver);
-    bball.doConstraints();
-  }
+  //nop
 }
 
 /**

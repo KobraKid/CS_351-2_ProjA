@@ -18,19 +18,12 @@ var GuiTracker = function() {
   this.constraint_0_z_min = 0;
   this.constraint_0_z_max = 2;
   this.constraint_0_drawn = true;
-  this.vel_x = 2;
-  this.vel_y = 2;
-  this.vel_z = 4;
-  this.addVel = function() {
-    bball.addForce(new Force(FORCE_TYPE.FORCE_WIND, 1, 0, 0, this.vel_x, TIMEOUT_INSTANT));
-    bball.addForce(new Force(FORCE_TYPE.FORCE_WIND, 0, 1, 0, this.vel_y, TIMEOUT_INSTANT));
-    bball.addForce(new Force(FORCE_TYPE.FORCE_WIND, 0, 0, 1, this.vel_z, TIMEOUT_INSTANT));
-  }
   this.drag = 0.985;
   this.gravity = 9.832;
   this.restitution = 1.0;
   this.solver = 1;
   this.bounce_type = 1;
+  this.fountain = false;
   this.clear = true;
   this.pause = false;
 }
@@ -88,14 +81,12 @@ function initGui() {
     bball.constraint_set[0].z_max = tracker.constraint_0_z_max;
     bball.constraint_set[0].draw(0, tracker.constraint_0_drawn);
   });
-  partSys1.add(tracker, 'constraint_0_drawn').name('visible').onChange(function(value) {
-    bball.constraint_set[0].draw(0, value);
+  partSys1.add(tracker, 'constraint_0_drawn').name('Visible').onChange(function(value) {
+    bball.constraint_set.forEach((constraint, i) => {
+      constraint.draw(i, value);
+    });
   });
-  var addVelocity = partSys1.addFolder('Add Velocity');
-  addVelocity.add(tracker, 'vel_x', -9, 9, 0.5);
-  addVelocity.add(tracker, 'vel_y', -9, 9, 0.5);
-  addVelocity.add(tracker, 'vel_z', -9, 9, 0.5);
-  addVelocity.add(tracker, 'addVel').name('Click to bounce!');
+  partSys1.add(tracker, 'fountain').name('Fountain');
   gui.add(tracker, 'drag', 0, 1, 0.005);
   gui.add(tracker, 'gravity', 0);
   gui.add(tracker, 'restitution');
