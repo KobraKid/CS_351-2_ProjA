@@ -281,7 +281,7 @@ function initParticleSystems() {
  * Updates all of the Particle Systems.
  */
 function updateAll() {
-  // fps();
+  fps();
 }
 
 /**
@@ -302,5 +302,5 @@ function fps() {
   var now = Date.now();
   var elapsed = now - prev;
   prev = now;
-  console.log(elapsed);
+  tracker.fps = elapsed;
 }

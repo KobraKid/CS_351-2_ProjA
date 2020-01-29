@@ -111,6 +111,7 @@ function keyDown(kev) {
       g_perspective_lookat[1] = g_perspective_eye[1] + Math.sin(theta);
       break;
     case "Space":
+    case "32":
     for (var i = 0; i < PARTICLE_COUNT; i++) {
       bball.addForce(new Force(
         FORCE_TYPE.FORCE_WIND,

@@ -26,6 +26,7 @@ var GuiTracker = function() {
   this.fountain = false;
   this.clear = true;
   this.pause = false;
+  this.fps = 0;
 }
 var tracker = new GuiTracker();
 var help_visible = false;
@@ -108,8 +109,9 @@ function initGui() {
   });
   gui.add(tracker, 'clear').name('Clear screen?').listen();
   gui.add(tracker, 'pause').name('Pause').listen();
-  if (gui_open)
-    gui.close();
+  gui.add(tracker, 'fps').name('FPS').listen();
+  if (!gui_open)
+    gui.open();
   document.getElementsByClassName('close-bottom')[0].onclick = function() {
     gui_open = !gui_open;
   };
@@ -134,3 +136,5 @@ function toggle_help() {
   document.getElementById("help-menu-expanded").style.visibility = help_visible ? "visible" : "hidden";
   document.getElementById("help-menu").innerHTML = help_visible ? "Hide Help" : "Show Help";
 }
+
+toggle_help();
