@@ -28,7 +28,7 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var PARTICLE_COUNT = 1000;
+var PARTICLE_COUNT = 10;
 var bball = new PartSys(PARTICLE_COUNT);
 
 /**
@@ -281,7 +281,7 @@ function initParticleSystems() {
  * Updates all of the Particle Systems.
  */
 function updateAll() {
-  //nop
+  // fps();
 }
 
 /**
@@ -295,4 +295,12 @@ function drawAll() {
     box.adjust();
     box.draw();
   });
+}
+
+var prev = Date.now();;
+function fps() {
+  var now = Date.now();
+  var elapsed = now - prev;
+  prev = now;
+  console.log(elapsed);
 }

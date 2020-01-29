@@ -149,14 +149,11 @@ class PartSys {
       this.s1[i + STATE.P_Z] = this.s2[i + STATE.P_Z];
       this.s1[i + STATE.V_Z] = this.s2[i + STATE.V_Z];
     }
+    // TODO: Make solvers correctly explicit/implicit. Currently both are explicit
     if (solver_type == 0) { // EXPLICIT (adds energy)
       for (var i = 0; i < this.s2.length; i ++) {
         this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
-        // this.s2[i + STATE.P_X] += this.s2[i + STATE.V_X] * (timeStep * 0.001);
-        // this.s2[i + STATE.P_Y] += this.s2[i + STATE.V_Y] * (timeStep * 0.001);
-        // this.s2[i + STATE.P_Z] += this.s2[i + STATE.V_Z] * (timeStep * 0.001);
       }
-      // this.applyAllForces();
     } else if (solver_type == 1) { // IMPLICIT (loses energy)
       for (var i = 0; i < this.s2.length; i ++) {
         this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
@@ -304,9 +301,9 @@ class Force {
         break;
       case FORCE_TYPE.FORCE_DRAG:
         for (var i = 0; i < this._p.length; i++) {
-          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += s[(this._p[i] * STATE_SIZE) + STATE.V_X] * (this.x * this.magnitude);
-          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += s[(this._p[i] * STATE_SIZE) + STATE.V_Y] * (this.y * this.magnitude);
-          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += s[(this._p[i] * STATE_SIZE) + STATE.V_Z] * (this.z * this.magnitude);
+          s[(this._p[i] * STATE_SIZE) + STATE.F_X] -= s[(this._p[i] * STATE_SIZE) + STATE.V_X] * (this.x * this.magnitude);
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] -= s[(this._p[i] * STATE_SIZE) + STATE.V_Y] * (this.y * this.magnitude);
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] -= s[(this._p[i] * STATE_SIZE) + STATE.V_Z] * (this.z * this.magnitude);
         }
         break;
       case FORCE_TYPE.FORCE_WIND:
