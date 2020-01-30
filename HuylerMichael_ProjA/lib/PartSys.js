@@ -31,11 +31,14 @@ class PartSys {
     this._particle_count = particle_count;
     this._s1 = new Float32Array(particle_count * STATE_SIZE);
     for (var i = 0; i < particle_count * STATE_SIZE; i += STATE_SIZE) {
-      this._s1[i + STATE.P_Z] = 0.95;
+      this._s1[i + STATE.P_X] = Math.random() * 2 - 1;
+      this._s1[i + STATE.P_Y] = Math.random() * 2 - 1;
+      this._s1[i + STATE.P_Z] = Math.random() * 2;
       this._s1[i + STATE.MASS] = 1;
     }
     this._s1dot = this._s1.slice();
     this._s2 = this._s1.slice();
+    this._s2dot = this._s1.slice();
     this._force_set = [];
     this._constraint_set = [];
   }
@@ -48,6 +51,9 @@ class PartSys {
   }
   get s2() {
     return this._s2;
+  }
+  get s2dot() {
+    return this._s2dot;
   }
   get force_set() {
     return this._force_set;
@@ -64,6 +70,9 @@ class PartSys {
   }
   set s2(s) {
     this._s2 = s;
+  }
+  set s2dot(s) {
+    this._s2dot = s;
   }
   set force_set(f) {
     if (f instanceof Force) {
@@ -148,14 +157,16 @@ class PartSys {
         this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
       }
     } else if (solver_type == 1) { // IMPLICIT (loses energy)
-      for (var i = 0; i < this.s2.length; i += STATE_SIZE) {
-        this.s2[i + STATE.V_Z] -= tracker.gravity * (timeStep * 0.001);
-        this.s2[i + STATE.V_X] *= tracker.drag;
-        this.s2[i + STATE.V_Y] *= tracker.drag;
-        this.s2[i + STATE.V_Z] *= tracker.drag;
-        this.s2[i + STATE.P_X] += this.s2[i + STATE.V_X] * (timeStep * 0.001);
-        this.s2[i + STATE.P_Y] += this.s2[i + STATE.V_Y] * (timeStep * 0.001);
-        this.s2[i + STATE.P_Z] += this.s2[i + STATE.V_Z] * (timeStep * 0.001);
+      for (var i = 0; i < this.s2.length; i++ /* i += STATE_SIZE */) {
+        // TODO: Still not quite losing energy, but can be affected by wind force now
+        this.s2[i] = this.s1[i] + this.s2dot[i] * (timeStep * 0.001);
+        // this.s2[i + STATE.V_Z] -= tracker.gravity * (timeStep * 0.001);
+        // this.s2[i + STATE.V_X] *= tracker.drag;
+        // this.s2[i + STATE.V_Y] *= tracker.drag;
+        // this.s2[i + STATE.V_Z] *= tracker.drag;
+        // this.s2[i + STATE.P_X] += this.s2[i + STATE.V_X] * (timeStep * 0.001);
+        // this.s2[i + STATE.P_Y] += this.s2[i + STATE.V_Y] * (timeStep * 0.001);
+        // this.s2[i + STATE.P_Z] += this.s2[i + STATE.V_Z] * (timeStep * 0.001);
       }
     } else {
       console.log('unknown solver: ' + solver_type);
@@ -179,8 +190,8 @@ class PartSys {
           this.s2[i + STATE.P_Z] = 0.4 * Math.random();
           this.s2[i + STATE.V_X] = 0.8 * Math.random() - 0.4;
           this.s2[i + STATE.V_Y] = 0.8 * Math.random() - 0.4;
-          this.s2[i + STATE.V_Z] = 3.0 * Math.random();
-          this.s2[i + STATE.AGE] = 30 + 30 * Math.random();
+          this.s2[i + STATE.V_Z] = 10.0 * Math.random();
+          this.s2[i + STATE.AGE] = 30 + 100 * Math.random();
         }
       }
     }
@@ -431,7 +442,7 @@ class Constraint {
           // bounce on left wall
           if ((this._walls & WALL.LEFT) &&
             s2[(this._p[i] * STATE_SIZE) + STATE.P_X] < this._x_min &&
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] < 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] <= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x_min;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_X] =
               Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_X]) * tracker.drag * tracker.restitution;
@@ -439,14 +450,14 @@ class Constraint {
           // bounce on right wall
           if ((this._walls & WALL.RIGHT) &&
             s2[(this._p[i] * STATE_SIZE) + STATE.P_X] > this._x_max &&
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] > 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] >= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x_max;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_X]) * tracker.drag * tracker.restitution * -1;
           }
           // bounce on front wall
           if ((this._walls & WALL.FRONT) &&
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] < this._y_min &&
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] < 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] <= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y_min;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] =
               Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Y]) * tracker.drag * tracker.restitution;
@@ -454,7 +465,7 @@ class Constraint {
           // bounce on back wall
           if ((this._walls & WALL.BACK) &&
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] > this._y_max &&
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] > 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] >= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y_max;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] =
               Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Y]) * tracker.drag * tracker.restitution * -1;
@@ -462,7 +473,7 @@ class Constraint {
           // bounce on floor
           if ((this._walls & WALL.BOTTOM) &&
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] < this._z_min &&
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] < 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] <= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_min;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] =
               Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Z]) * tracker.drag * tracker.restitution;
@@ -470,7 +481,7 @@ class Constraint {
           // bounce on ceiling
           if ((this._walls & WALL.TOP) &&
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] > this._z_max &&
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] > 0.0) {
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] >= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_max;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] =
               Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Z]) * tracker.drag * tracker.restitution * -1;

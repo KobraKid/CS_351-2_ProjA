@@ -28,7 +28,7 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var PARTICLE_COUNT = 100;
+var PARTICLE_COUNT = 1000;
 var bball = new PartSys(PARTICLE_COUNT);
 
 /**
@@ -200,7 +200,8 @@ function initVBOBoxes() {
     () => {
       if (!tracker.pause) {
         bball.applyAllForces(bball.s1);
-        bball.s1dot = bball.dotFinder(bball.s2);
+        bball.s1dot = bball.dotFinder(bball.s1);
+        bball.s2dot = bball.dotFinder(bball.s2);
         bball.solver(tracker.solver);
         bball.doConstraints();
         bball.render(vbo_1);
