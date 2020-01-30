@@ -112,15 +112,15 @@ function keyDown(kev) {
       break;
     case "Space":
     case "32":
-    for (var i = 0; i < PARTICLE_COUNT; i++) {
-      bball.addForce(new Force(
-        FORCE_TYPE.FORCE_WIND,
-        Math.random() * 2 - 1,
-        Math.random() * 2 - 1,
-        Math.random() * 2,
-        INIT_VEL * Math.random(),
-        TIMEOUT_INSTANT,
-        [i]));
+      for (var i = 0; i < PARTICLE_COUNT; i++) {
+        bball.addForce(new Force(
+          FORCE_TYPE.FORCE_WIND,
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+          Math.random() * 2,
+          INIT_VEL * Math.random(),
+          TIMEOUT_INSTANT,
+          [i]));
       }
       break;
     default:

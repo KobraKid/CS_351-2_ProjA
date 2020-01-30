@@ -4,7 +4,7 @@
  * @author Michael Huyler
  */
 
-const STATE_SIZE = 14;
+const STATE_SIZE = 15;
 const STATE = {
   P_X: 0,
   P_Y: 1,
@@ -31,6 +31,7 @@ class PartSys {
     this._particle_count = particle_count;
     this._s1 = new Float32Array(particle_count * STATE_SIZE);
     for (var i = 0; i < particle_count * STATE_SIZE; i += STATE_SIZE) {
+      this._s1[i + STATE.P_Z] = 0.95;
       this._s1[i + STATE.MASS] = 1;
     }
     this._s1dot = this._s1.slice();
@@ -141,23 +142,17 @@ class PartSys {
    * @param {number} solver_type The type of solver to use.
    */
   solver(solver_type) {
-    for (var i = 0; i < this.s2.length; i += STATE_SIZE) {
-      this.s1[i + STATE.P_X] = this.s2[i + STATE.P_X];
-      this.s1[i + STATE.V_X] = this.s2[i + STATE.V_X];
-      this.s1[i + STATE.P_Y] = this.s2[i + STATE.P_Y];
-      this.s1[i + STATE.V_Y] = this.s2[i + STATE.V_Y];
-      this.s1[i + STATE.P_Z] = this.s2[i + STATE.P_Z];
-      this.s1[i + STATE.V_Z] = this.s2[i + STATE.V_Z];
-    }
     // TODO: Make solvers correctly explicit/implicit. Currently both are explicit
     if (solver_type == 0) { // EXPLICIT (adds energy)
-      for (var i = 0; i < this.s2.length; i ++) {
+      for (var i = 0; i < this.s2.length; i++) {
         this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
       }
     } else if (solver_type == 1) { // IMPLICIT (loses energy)
-      for (var i = 0; i < this.s2.length; i ++) {
+      console.log(this.s2[STATE.P_Z], this.s2[STATE.V_Z]);
+      for (var i = 0; i < this.s2.length; i++) {
         this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
       }
+      console.log(this.s2[STATE.P_Z], this.s2[STATE.V_Z]);
     } else {
       console.log('unknown solver: ' + solver_type);
       return;
@@ -205,7 +200,7 @@ class PartSys {
    * @param {Float32Array} s2 The current state vector.
    */
   swap(s1, s2) {
-    [s1, s2] = [s2, s1];
+    s1.set(s2);
   }
 
   /**
@@ -308,9 +303,9 @@ class Force {
         break;
       case FORCE_TYPE.FORCE_WIND:
         for (var i = 0; i < this._p.length; i++) {
-          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += this.x * this.magnitude * Math.random();
-          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += this.y * this.magnitude * Math.random();
-          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += this.z * this.magnitude * Math.random();
+          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += this.x * this.magnitude * Math.random() * 100;
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += this.y * this.magnitude * Math.random() * 100;
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += this.z * this.magnitude * Math.random() * 100;
         }
         break;
       default:

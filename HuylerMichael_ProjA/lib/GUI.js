@@ -26,7 +26,18 @@ var GuiTracker = function() {
   this.fountain = false;
   this.clear = true;
   this.pause = false;
+  /* FPS */
   this.fps = 0;
+  var prev = Date.now();
+  /**
+   * Updatets the FPS in the GUI
+   */
+  this.fps_calc = function() {
+    var now = Date.now();
+    var elapsed = now - prev;
+    prev = now;
+    tracker.fps = elapsed;
+  }
 }
 var tracker = new GuiTracker();
 var help_visible = false;

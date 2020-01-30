@@ -28,7 +28,7 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var PARTICLE_COUNT = 10;
+var PARTICLE_COUNT = 100;
 var bball = new PartSys(PARTICLE_COUNT);
 
 /**
@@ -174,7 +174,7 @@ function initVBOBoxes() {
     void main() {
       gl_PointSize = 16.0;
       gl_Position = u_projection_matrix_1 * u_view_matrix_1 * u_model_matrix_1 * a_position_1;
-      v_color_1 = vec4(0.2, 1.0, 0.2, 1.0);
+      v_color_1 = vec4(1.0, 0.1, 0.3, 1.0);
     }`;
   var fragment_shader_1 = `
     precision mediump float;
@@ -204,7 +204,7 @@ function initVBOBoxes() {
         bball.solver(tracker.solver);
         bball.doConstraints();
         bball.render(vbo_1);
-        bball.swap();
+        bball.swap(bball.s1, bball.s2);
       }
     });
   vbo_1.init();
@@ -243,7 +243,7 @@ function initVBOBoxes() {
   vbo_2 = new VBOBox(
     vertex_shader_2,
     fragment_shader_2,
-    new Float32Array(7 * 24 * 4), // 7 attributes, 12 lines, 4 constraints
+    new Float32Array(7 * 24 * 4), // 7 attributes, 12 lines, max 4 constraints
     gl.LINES,
     7, {
       'a_position_2': 3,
@@ -264,9 +264,9 @@ function initParticleSystems() {
   bball.init(0,
     [
       // gravity
-      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, 0, 0, 1, -tracker.gravity * (timeStep * 0.001), TIMEOUT_NO_TIMEOUT, particles),
+      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, 0, 0, 1, -tracker.gravity, TIMEOUT_NO_TIMEOUT, particles),
       // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT, particles),
+      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, (1 - tracker.drag), TIMEOUT_NO_TIMEOUT, particles),
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(PARTICLE_COUNT / 2, PARTICLE_COUNT), WALL.ALL, -1, 1, -1, 1, 1, 2),
@@ -281,7 +281,7 @@ function initParticleSystems() {
  * Updates all of the Particle Systems.
  */
 function updateAll() {
-  fps();
+  tracker.fps_calc();
 }
 
 /**
@@ -295,12 +295,4 @@ function drawAll() {
     box.adjust();
     box.draw();
   });
-}
-
-var prev = Date.now();;
-function fps() {
-  var now = Date.now();
-  var elapsed = now - prev;
-  prev = now;
-  tracker.fps = elapsed;
 }
