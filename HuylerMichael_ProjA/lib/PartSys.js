@@ -148,11 +148,15 @@ class PartSys {
         this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
       }
     } else if (solver_type == 1) { // IMPLICIT (loses energy)
-      console.log(this.s2[STATE.P_Z], this.s2[STATE.V_Z]);
-      for (var i = 0; i < this.s2.length; i++) {
-        this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
+      for (var i = 0; i < this.s2.length; i += STATE_SIZE) {
+        this.s2[i + STATE.V_Z] -= tracker.gravity * (timeStep * 0.001);
+        this.s2[i + STATE.V_X] *= tracker.drag;
+        this.s2[i + STATE.V_Y] *= tracker.drag;
+        this.s2[i + STATE.V_Z] *= tracker.drag;
+        this.s2[i + STATE.P_X] += this.s2[i + STATE.V_X] * (timeStep * 0.001);
+        this.s2[i + STATE.P_Y] += this.s2[i + STATE.V_Y] * (timeStep * 0.001);
+        this.s2[i + STATE.P_Z] += this.s2[i + STATE.V_Z] * (timeStep * 0.001);
       }
-      console.log(this.s2[STATE.P_Z], this.s2[STATE.V_Z]);
     } else {
       console.log('unknown solver: ' + solver_type);
       return;
@@ -303,9 +307,9 @@ class Force {
         break;
       case FORCE_TYPE.FORCE_WIND:
         for (var i = 0; i < this._p.length; i++) {
-          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += this.x * this.magnitude * Math.random() * 100;
-          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += this.y * this.magnitude * Math.random() * 100;
-          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += this.z * this.magnitude * Math.random() * 100;
+          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += this.x * this.magnitude * Math.random();
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += this.y * this.magnitude * Math.random();
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += this.z * this.magnitude * Math.random();
         }
         break;
       default:

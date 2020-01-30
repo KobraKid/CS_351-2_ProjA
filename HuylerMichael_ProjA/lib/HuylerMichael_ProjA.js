@@ -266,7 +266,7 @@ function initParticleSystems() {
       // gravity
       new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, 0, 0, 1, -tracker.gravity, TIMEOUT_NO_TIMEOUT, particles),
       // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, (1 - tracker.drag), TIMEOUT_NO_TIMEOUT, particles),
+      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT, particles),
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(PARTICLE_COUNT / 2, PARTICLE_COUNT), WALL.ALL, -1, 1, -1, 1, 1, 2),
