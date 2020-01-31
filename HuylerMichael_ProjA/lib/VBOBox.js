@@ -58,15 +58,13 @@ class VBOBox {
 
     /* Attribute metadata */
     this.attributes = [];
-    var offset = 0;
     for (var attribute in attributes) {
       this.attributes.push({
         name: attribute,
-        count: attributes[attribute],
-        offset: offset,
+        count: attributes[attribute][1],
+        offset: attributes[attribute][0]  * this.FSIZE,
         location: ''
       });
-      offset += attributes[attribute] * this.FSIZE;
     }
 
     /* Uniform variables and locations */

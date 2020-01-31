@@ -4,7 +4,7 @@
  * @author Michael Huyler
  */
 
-const STATE_SIZE = 15;
+const STATE_SIZE = 16;
 const STATE = {
   P_X: 0,
   P_Y: 1,
@@ -18,9 +18,23 @@ const STATE = {
   R: 9,
   G: 10,
   B: 11,
-  MASS: 12,
-  DIAMETER: 13,
-  AGE: 14,
+  A: 12,
+  MASS: 13,
+  DIAMETER: 14,
+  AGE: 15,
+};
+const SOLVER = {
+  EXPLICIT: {
+    EULER: 0,
+    MIDPOINT: 1,
+    RUNGA_KUTTA: 2,
+  },
+  IMPLICIT: {
+    NAIVE: 3,
+    ITER_BACK: 4,
+    MIDPOINT: 5,
+    VERLET: 6,
+  }
 };
 
 /**
@@ -35,10 +49,15 @@ class PartSys {
       this._s1[i + STATE.P_Y] = Math.random() * 2 - 1;
       this._s1[i + STATE.P_Z] = Math.random() * 2;
       this._s1[i + STATE.MASS] = 1;
+      this._s1[i + STATE.R] = Math.random();
+      this._s1[i + STATE.G] = Math.random();
+      this._s1[i + STATE.B] = Math.random();
+      this._s1[i + STATE.A] = 1;
     }
     this._s1dot = this._s1.slice();
     this._s2 = this._s1.slice();
-    this._s2dot = this._s1.slice();
+    this._sM = this._s1.slice();
+    this._sMdot = this._s1.slice();
     this._force_set = [];
     this._constraint_set = [];
   }
@@ -52,8 +71,11 @@ class PartSys {
   get s2() {
     return this._s2;
   }
-  get s2dot() {
-    return this._s2dot;
+  get sM() {
+    return this._sM;
+  }
+  get sMdot() {
+    return this._sMdot;
   }
   get force_set() {
     return this._force_set;
@@ -71,8 +93,11 @@ class PartSys {
   set s2(s) {
     this._s2 = s;
   }
-  set s2dot(s) {
-    this._s2dot = s;
+  set sM(s) {
+    this._sM = s;
+  }
+  set sMdot(s) {
+    this._sMdot = s;
   }
   set force_set(f) {
     if (f instanceof Force) {
@@ -138,6 +163,7 @@ class PartSys {
       dot[i + STATE.R] = 0;
       dot[i + STATE.G] = 0;
       dot[i + STATE.B] = 0;
+      dot[i + STATE.A] = 0;
       dot[i + STATE.MASS] = 0;
       dot[i + STATE.DIAMETER] = 0;
       dot[i + STATE.AGE] = 0;
@@ -151,26 +177,36 @@ class PartSys {
    * @param {number} solver_type The type of solver to use.
    */
   solver(solver_type) {
-    // TODO: Make solvers correctly explicit/implicit. Currently both are explicit
-    if (solver_type == 0) { // EXPLICIT (adds energy)
-      for (var i = 0; i < this.s2.length; i++) {
-        this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
-      }
-    } else if (solver_type == 1) { // IMPLICIT (loses energy)
-      for (var i = 0; i < this.s2.length; i++ /* i += STATE_SIZE */) {
-        // TODO: Still not quite losing energy, but can be affected by wind force now
-        this.s2[i] = this.s1[i] + this.s2dot[i] * (timeStep * 0.001);
-        // this.s2[i + STATE.V_Z] -= tracker.gravity * (timeStep * 0.001);
-        // this.s2[i + STATE.V_X] *= tracker.drag;
-        // this.s2[i + STATE.V_Y] *= tracker.drag;
-        // this.s2[i + STATE.V_Z] *= tracker.drag;
-        // this.s2[i + STATE.P_X] += this.s2[i + STATE.V_X] * (timeStep * 0.001);
-        // this.s2[i + STATE.P_Y] += this.s2[i + STATE.V_Y] * (timeStep * 0.001);
-        // this.s2[i + STATE.P_Z] += this.s2[i + STATE.V_Z] * (timeStep * 0.001);
-      }
-    } else {
-      console.log('unknown solver: ' + solver_type);
-      return;
+    switch (solver_type) {
+      case SOLVER.EXPLICIT.EULER:
+      case 0:
+        for (var i = 0; i < this.s2.length; i++) {
+          this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
+        }
+        break;
+      case SOLVER.EXPLICIT.MIDPOINT:
+        for (var i = 0; i < this.s2.length; i++) {
+          this.sM[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.0005);
+        }
+        this.sMdot = this.dotFinder(this.sM);
+        for (var i = 0; i < this.s2.length; i++) {
+          this.s2[i] = this.s1[i] + this.sMdot[i] * (timeStep * 0.001);
+        }
+        break;
+      case SOLVER.IMPLICIT.NAIVE:
+        for (var i = 0; i < this.s2.length; i += STATE_SIZE) {
+          this.s2[i + STATE.V_Z] -= tracker.gravity * (timeStep * 0.001);
+          this.s2[i + STATE.V_X] *= tracker.drag;
+          this.s2[i + STATE.V_Y] *= tracker.drag;
+          this.s2[i + STATE.V_Z] *= tracker.drag;
+          this.s2[i + STATE.P_X] += this.s2[i + STATE.V_X] * (timeStep * 0.001);
+          this.s2[i + STATE.P_Y] += this.s2[i + STATE.V_Y] * (timeStep * 0.001);
+          this.s2[i + STATE.P_Z] += this.s2[i + STATE.V_Z] * (timeStep * 0.001);
+        }
+        break;
+      default:
+        console.log('unknown solver: ' + solver_type);
+        break;
     }
   }
 

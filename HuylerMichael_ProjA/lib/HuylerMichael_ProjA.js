@@ -28,7 +28,7 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var PARTICLE_COUNT = 1000;
+var PARTICLE_COUNT = 100;
 var bball = new PartSys(PARTICLE_COUNT);
 
 /**
@@ -152,8 +152,8 @@ function initVBOBoxes() {
     verts,
     gl.LINES,
     7, {
-      'a_position_0': 4,
-      'a_color_0': 3
+      'a_position_0': [0, 4],
+      'a_color_0': [4, 3],
     },
     0,
     () => {});
@@ -168,13 +168,14 @@ function initVBOBoxes() {
     uniform mat4 u_projection_matrix_1;
 
     attribute vec4 a_position_1;
+    attribute vec4 a_color_1;
 
     varying vec4 v_color_1;
 
     void main() {
       gl_PointSize = 16.0;
       gl_Position = u_projection_matrix_1 * u_view_matrix_1 * u_model_matrix_1 * a_position_1;
-      v_color_1 = vec4(1.0, 0.1, 0.3, 1.0);
+      v_color_1 = vec4(a_color_1);
     }`;
   var fragment_shader_1 = `
     precision mediump float;
@@ -194,15 +195,15 @@ function initVBOBoxes() {
     new Float32Array(PARTICLE_COUNT * STATE_SIZE),
     gl.POINTS,
     STATE_SIZE, {
-      'a_position_1': 3
+      'a_position_1': [0, 3],
+      'a_color_1': [9, 4],
     },
     1,
     () => {
       if (!tracker.pause) {
         bball.applyAllForces(bball.s1);
         bball.s1dot = bball.dotFinder(bball.s1);
-        bball.s2dot = bball.dotFinder(bball.s2);
-        bball.solver(tracker.solver);
+        bball.solver(Number(tracker.solver));
         bball.doConstraints();
         bball.render(vbo_1);
         bball.swap(bball.s1, bball.s2);
@@ -247,9 +248,9 @@ function initVBOBoxes() {
     new Float32Array(7 * 24 * 4), // 7 attributes, 12 lines, max 4 constraints
     gl.LINES,
     7, {
-      'a_position_2': 3,
-      'a_color_2': 3,
-      'a_enabled_2': 1
+      'a_position_2': [0, 3],
+      'a_color_2': [3, 3],
+      'a_enabled_2': [6, 1],
     },
     2,
     () => {});

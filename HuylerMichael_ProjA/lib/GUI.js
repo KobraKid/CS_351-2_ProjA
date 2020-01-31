@@ -21,7 +21,7 @@ var GuiTracker = function() {
   this.drag = 0.985;
   this.gravity = 9.832;
   this.restitution = 1.0;
-  this.solver = 1;
+  this.solver = SOLVER.IMPLICIT.NAIVE;
   this.bounce_type = 1;
   this.fountain = false;
   this.clear = true;
@@ -103,8 +103,13 @@ function initGui() {
   gui.add(tracker, 'gravity', 0);
   gui.add(tracker, 'restitution');
   gui.add(tracker, 'solver', {
-    'Explicit': 0,
-    'Implicit': 1
+    'Explicit: Euler': 0,
+    'Explicit: Midpoint': 1,
+    'Explicit: Runga-Kutta': 2,
+    'Implicit: Naive': 3,
+    'Implicit: Iterative Backwind': 4,
+    'Implicit: Midpoint': 5,
+    'Implicit: Verlet': 6,
   });
   gui.add(tracker, 'bounce_type', {
     'Velocity Reverse': 0,
