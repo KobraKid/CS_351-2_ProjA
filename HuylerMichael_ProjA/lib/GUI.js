@@ -21,8 +21,8 @@ var GuiTracker = function() {
   this.drag = 0.985;
   this.gravity = 9.832;
   this.restitution = 1.0;
-  this.solver = SOLVER.IMPLICIT.NAIVE;
-  this.bounce_type = 1;
+  this.solver = SOLVER.MIDPOINT;
+  this.bounce_type = CONSTRAINT_TYPE.VOLUME_IMPULSIVE;
   this.fountain = false;
   this.clear = true;
   this.pause = false;
@@ -50,70 +50,21 @@ function initGui() {
     name: 'My GUI',
     hideable: false
   });
-  var partSys1 = gui.addFolder('Particle System 1');
-  partSys1.add(tracker, 'constraint_0_x_min').name('x-min').onChange(function() {
-    if (tracker.constraint_0_x_min > tracker.constraint_0_x_max) {
-      tracker.constraint_0_x_min = tracker.constraint_0_x_max - 0.1;
-    }
-    bball.constraint_set[0].x_min = tracker.constraint_0_x_min;
-    bball.constraint_set[0].draw(0, tracker.constraint_0_drawn);
-  });
-  partSys1.add(tracker, 'constraint_0_x_max').name('x-max').onChange(function() {
-    if (tracker.constraint_0_x_max < tracker.constraint_0_x_min) {
-      tracker.constraint_0_x_max = tracker.constraint_0_x_min + 0.1;
-    }
-    bball.constraint_set[0].x_max = tracker.constraint_0_x_max;
-    bball.constraint_set[0].draw(0, tracker.constraint_0_drawn);
-  });
-  partSys1.add(tracker, 'constraint_0_y_min').name('y-min').onChange(function() {
-    if (tracker.constraint_0_y_min > tracker.constraint_0_y_max) {
-      tracker.constraint_0_y_min = tracker.constraint_0_y_max - 0.1;
-    }
-    bball.constraint_set[0].y_min = tracker.constraint_0_y_min;
-    bball.constraint_set[0].draw(0, tracker.constraint_0_drawn);
-  });
-  partSys1.add(tracker, 'constraint_0_y_max').name('y-max').onChange(function() {
-    if (tracker.constraint_0_y_max < tracker.constraint_0_y_min) {
-      tracker.constraint_0_y_max = tracker.constraint_0_y_min + 0.1;
-    }
-    bball.constraint_set[0].y_max = tracker.constraint_0_y_max;
-    bball.constraint_set[0].draw(0, tracker.constraint_0_drawn);
-  });
-  partSys1.add(tracker, 'constraint_0_z_min').name('z-min').onChange(function() {
-    if (tracker.constraint_0_z_min > tracker.constraint_0_z_max) {
-      tracker.constraint_0_z_min = tracker.constraint_0_z_max - 0.1;
-    }
-    bball.constraint_set[0].z_min = tracker.constraint_0_z_min;
-    bball.constraint_set[0].draw(0, tracker.constraint_0_drawn);
-  });
-  partSys1.add(tracker, 'constraint_0_z_max').name('z-max').onChange(function() {
-    if (tracker.constraint_0_z_max < tracker.constraint_0_z_min) {
-      tracker.constraint_0_z_max = tracker.constraint_0_z_min + 0.1;
-    }
-    bball.constraint_set[0].z_max = tracker.constraint_0_z_max;
-    bball.constraint_set[0].draw(0, tracker.constraint_0_drawn);
-  });
-  partSys1.add(tracker, 'constraint_0_drawn').name('Visible').onChange(function(value) {
-    bball.constraint_set.forEach((constraint, i) => {
-      constraint.draw(i, value);
-    });
-  });
-  partSys1.add(tracker, 'fountain').name('Fountain');
+  gui.add(tracker, 'fps').name('FPS').listen();
+  gui.add(tracker, 'fountain').name('Fountain');
   gui.add(tracker, 'drag', 0, 1, 0.005);
   gui.add(tracker, 'gravity', 0);
   gui.add(tracker, 'restitution');
   gui.add(tracker, 'solver', {
-    'Explicit: Euler': 0,
-    'Explicit: Midpoint': 1,
-    'Explicit: Runga-Kutta': 2,
-    'Implicit: Naive': 3,
-    'Implicit: Iterative Backwind': 4,
-    'Implicit: Midpoint': 5,
-    'Implicit: Verlet': 6,
+    'Euler': 0,
+    'Midpoint': 1,
+    'Runga-Kutta': 2,
+    'Iterative Backwind': 3,
+    'Verlet': 4,
   });
   gui.add(tracker, 'bounce_type', {
-    'Velocity Reverse': 0,
-    'Impulsive': 1
+    'Velocity Reverse': CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE,
+    'Impulsive': CONSTRAINT_TYPE.VOLUME_IMPULSIVE,
   }).name('bounce type').onChange(function(value) {
     if (value == 0) {
       bball.removeConstraint(0);
@@ -125,7 +76,6 @@ function initGui() {
   });
   gui.add(tracker, 'clear').name('Clear screen?').listen();
   gui.add(tracker, 'pause').name('Pause').listen();
-  gui.add(tracker, 'fps').name('FPS').listen();
   if (!gui_open)
     gui.open();
   document.getElementsByClassName('close-bottom')[0].onclick = function() {

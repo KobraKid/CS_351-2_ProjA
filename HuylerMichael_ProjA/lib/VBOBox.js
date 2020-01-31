@@ -22,8 +22,8 @@ var theta = 3.14;
  */
 class VBOBox {
   /**
-   * @param {string} VERTEX_SHADER The vertex shader for this box.
-   * @param {string} FRAGMENT_SHADER The fragment shader for this box.
+   * @param {String} VERTEX_SHADER The vertex shader for this box.
+   * @param {String} FRAGMENT_SHADER The fragment shader for this box.
    * @param {Float32Array} vertex_array An array of vertices to be loaded into the VBO.
    * @param {GLenum} draw_method The mode to be used when calling WebGLRenderingContext.drawArrays().
    * @param {number} attribute_count The number of attributes each vertex has.

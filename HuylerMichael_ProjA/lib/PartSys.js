@@ -4,7 +4,21 @@
  * @author Michael Huyler
  */
 
-const STATE_SIZE = 16;
+/**
+ * Types of particle systems.
+ *
+ * @enum {number}
+ */
+const PARTICLE_SYSTEM = {
+  BOUNCY_BALL: 0,
+};
+const PARTICLE_SYSTEM_STRINGS = ["Bouncy Ball"];
+
+/**
+ * States stored in a state array.
+ *
+ * @enum {number}
+ */
 const STATE = {
   P_X: 0,
   P_Y: 1,
@@ -23,25 +37,30 @@ const STATE = {
   DIAMETER: 14,
   AGE: 15,
 };
+const STATE_SIZE = 16;
+
+/**
+ * Types of solvers.
+ *
+ * @enum {number}
+ */
 const SOLVER = {
-  EXPLICIT: {
-    EULER: 0,
-    MIDPOINT: 1,
-    RUNGA_KUTTA: 2,
-  },
-  IMPLICIT: {
-    NAIVE: 3,
-    ITER_BACK: 4,
-    MIDPOINT: 5,
-    VERLET: 6,
-  }
+  EULER: 0,
+  MIDPOINT: 1,
+  RUNGA_KUTTA: 2,
+  ITER_BACK: 3,
+  VERLET: 4,
 };
 
 /**
  * Abstract Particle System.
  */
 class PartSys {
+  /**
+   * @param {number} particle_count The number of particles to initialize.
+   */
   constructor(particle_count) {
+    this._type = -1;
     this._particle_count = particle_count;
     this._s1 = new Float32Array(particle_count * STATE_SIZE);
     for (var i = 0; i < particle_count * STATE_SIZE; i += STATE_SIZE) {
@@ -62,6 +81,9 @@ class PartSys {
     this._constraint_set = [];
   }
 
+  get type() {
+    return this._type;
+  }
   get s1() {
     return this._s1;
   }
@@ -109,25 +131,21 @@ class PartSys {
     }
   }
   set constraint_set(c) {
-    if (c instanceof Constraint) {
-      this._constraint_set.push(c);
-    } else if (Array.isArray(c)) {
-      this._constraint_set = c;
-    } else {
-      console.error("improper constraint: " + typeof(c));
-    }
+    this._constraint_set = c;
   }
 
   /**
    * Sets up a particular particle system, influencing its general behavior.
    *
-   * @param {number} part_sys_type The type of particle system to create.
+   * @param {PARTICLE_SYSTEM} part_sys_type The type of particle system to create.
    * @param {Array<Force>} force_set The set of initial forces acting on this particle system.
    * @param {Array<Constraint>} constraint_set The set of initial constraints limiting this particle system.
    */
   init(part_sys_type, force_set, constraint_set) {
+    this._type = part_sys_type;
     this.force_set = force_set;
     this.constraint_set = constraint_set;
+    this.insertGui();
   }
 
   /**
@@ -174,17 +192,17 @@ class PartSys {
   /**
    * Creates s2 by approximating integration of s1 over a single timestep.
    *
-   * @param {number} solver_type The type of solver to use.
+   * @param {SOLVER} solver_type The type of solver to use.
    */
   solver(solver_type) {
     switch (solver_type) {
-      case SOLVER.EXPLICIT.EULER:
+      case SOLVER.EULER:
       case 0:
         for (var i = 0; i < this.s2.length; i++) {
           this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
         }
         break;
-      case SOLVER.EXPLICIT.MIDPOINT:
+      case SOLVER.MIDPOINT:
         for (var i = 0; i < this.s2.length; i++) {
           this.sM[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.0005);
         }
@@ -193,16 +211,8 @@ class PartSys {
           this.s2[i] = this.s1[i] + this.sMdot[i] * (timeStep * 0.001);
         }
         break;
-      case SOLVER.IMPLICIT.NAIVE:
-        for (var i = 0; i < this.s2.length; i += STATE_SIZE) {
-          this.s2[i + STATE.V_Z] -= tracker.gravity * (timeStep * 0.001);
-          this.s2[i + STATE.V_X] *= tracker.drag;
-          this.s2[i + STATE.V_Y] *= tracker.drag;
-          this.s2[i + STATE.V_Z] *= tracker.drag;
-          this.s2[i + STATE.P_X] += this.s2[i + STATE.V_X] * (timeStep * 0.001);
-          this.s2[i + STATE.P_Y] += this.s2[i + STATE.V_Y] * (timeStep * 0.001);
-          this.s2[i + STATE.P_Z] += this.s2[i + STATE.V_Z] * (timeStep * 0.001);
-        }
+      case SOLVER.ITER_BACK:
+
         break;
       default:
         console.log('unknown solver: ' + solver_type);
@@ -271,11 +281,106 @@ class PartSys {
    * @param {Constraint} c The constraint to be added to this particle system.
    */
   addConstraint(c) {
-    this.constraint_set = c;
+    this.constraint_set.push(c);
   }
 
-  removeConstraint(i) {
-    this.constraint_set.splice(i, 1);
+  /**
+   * Removes
+   */
+  disableConstraint(i) {
+    this.constraint_set[i].disable();
+  }
+
+  toString() {
+    var partSysString = "" + this._particle_count;
+    for (var constraint in this.constraint_set) {
+      partSysString += constraint.toString();
+    }
+    return partSysString;
+  }
+
+  /**
+   * Automatically creates controls for this particle system.
+   */
+  insertGui() {
+    // Compute hash to distinguish this particle system
+    const hash = hex_sha1(this.toString());
+    var partSysFolder = gui.addFolder(PARTICLE_SYSTEM_STRINGS[this.type] + ' Particle System [' + hash.substring(0, 8) + ']');
+
+    // Add a master toggle to hide all of this particle system's constraints
+    tracker[hash + "_drawn"] = true;
+    partSysFolder.add(tracker, hash + "_drawn").name("Show constraints").onChange(function(value) {
+      this.constraint_set.forEach((constraint, i) => constraint.draw(i, value && tracker["c_" + hash + "_" + hex_sha1(this.constraint_set[i].toString()) + "_drawn"]));
+    }.bind(this));
+
+    // Add controls for each constraint individually
+    for (var index in this.constraint_set) {
+      // Create unique attributes in the tracker object
+      var constraintSubFolder = partSysFolder.addFolder('Constraint ' + index);
+      const c_hash = hex_sha1(this.constraint_set[index].toString());
+      const attr = "c_" + hash + "_" + c_hash;
+      const i = index;
+
+      // Toggle drawing this constraint
+      tracker[attr + "_drawn"] = true;
+      partSysFolder.add(tracker, attr + "_drawn").name("Visible").onChange(function(value) {
+        this.constraint_set[i].draw(i, value && tracker[hash + "_drawn"]);
+      }.bind(this));
+
+      // Adjust this constraint's bounds
+      tracker[attr + "_x_min"] = this.constraint_set[i].bounds[0];
+      constraintSubFolder.add(tracker, attr + "_x_min").name("x-min").onChange(function() {
+        if (tracker[attr + "_x_min"] >= tracker[attr + "_x_max"]) {
+          tracker[attr + "_x_min"] = tracker[attr + "_x_max"] - 0.1;
+        }
+        this.constraint_set[i].x_min = tracker[attr + "_x_min"];
+        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+      }.bind(this));
+      tracker[attr + "_x_max"] = this.constraint_set[i].bounds[1];
+      constraintSubFolder.add(tracker, attr + "_x_max").name("x-max").onChange(function() {
+        if (tracker[attr + "_x_max"] <= tracker[attr + "_x_min"]) {
+          tracker[attr + "_x_max"] = tracker[attr + "_x_min"] + 0.1;
+        }
+        this.constraint_set[i].x_max = tracker[attr + "_x_max"];
+        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+      }.bind(this));
+      tracker[attr + "_y_min"] = this.constraint_set[i].bounds[2];
+      constraintSubFolder.add(tracker, attr + "_y_min").name("y-min").onChange(function() {
+        if (tracker[attr + "_y_min"] >= tracker[attr + "_y_max"]) {
+          tracker[attr + "_y_min"] = tracker[attr + "_y_max"] - 0.1;
+        }
+        this.constraint_set[i].y_min = tracker[attr + "_y_min"];
+        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+      }.bind(this));
+      tracker[attr + "_y_max"] = this.constraint_set[i].bounds[3];
+      constraintSubFolder.add(tracker, attr + "_y_max").name("y-max").onChange(function() {
+        if (tracker[attr + "_y_max"] <= tracker[attr + "_y_min"]) {
+          tracker[attr + "_y_max"] = tracker[attr + "_y_min"] + 0.1;
+        }
+        this.constraint_set[i].y_max = tracker[attr + "_y_max"];
+        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+      }.bind(this));
+      tracker[attr + "_z_min"] = this.constraint_set[i].bounds[4];
+      constraintSubFolder.add(tracker, attr + "_z_min").name("z-min").onChange(function() {
+        if (tracker[attr + "_z_min"] >= tracker[attr + "_z_max"]) {
+          tracker[attr + "_z_min"] = tracker[attr + "_z_max"] - 0.1;
+        }
+        this.constraint_set[i].z_min = tracker[attr + "_z_min"];
+        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+      }.bind(this));
+      tracker[attr + "_z_max"] = this.constraint_set[i].bounds[5];
+      constraintSubFolder.add(tracker, attr + "_z_max").name("z-max").onChange(function() {
+        if (tracker[attr + "_z_max"] <= tracker[attr + "_z_min"]) {
+          tracker[attr + "_z_max"] = tracker[attr + "_z_min"] + 0.1;
+        }
+        this.constraint_set[i].z_max = tracker[attr + "_z_max"];
+        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+      }.bind(this));
+      tracker[attr + "_enabled"] = true;
+      constraintSubFolder.add(tracker, attr + "_enabled").name("Enabled").onChange(function(value) {
+        value ? this.constraint_set[i].enable() : this.constraint_set[i].disable();
+      }.bind(this));
+    }
   }
 }
 
@@ -388,6 +493,8 @@ class Force {
 
 /**
  * Types of Constraints.
+ *
+ * @enum {number}
  */
 const CONSTRAINT_TYPE = {
   VOLUME_IMPULSIVE: 0,
@@ -396,8 +503,14 @@ const CONSTRAINT_TYPE = {
   STIFF_SPRING: 3,
 };
 
+/**
+ * Shortcut values for enabling only particular walls in a volume constraint.
+ *
+ * @enum {number}
+ */
 const WALL = {
   ALL: 0b111111,
+  NONE: 0b000000,
   TOP: 0b000001,
   BOTTOM: 0b000010,
   FRONT: 0b000100,
@@ -444,6 +557,24 @@ class Constraint {
     }
     this._p = affected_particles;
     this._walls = enabled_walls;
+    this._enabled = true;
+  }
+
+  get type() {
+    return this._type;
+  }
+  get bounds() {
+    var out;
+    switch (this.type) {
+      case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
+      case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
+        out = [this._x_min, this._x_max, this._y_min, this._y_max, this._z_min, this._z_max];
+        break;
+      default:
+        out = [];
+        break;
+    }
+    return out;
   }
 
   set x_min(x) {
@@ -466,12 +597,28 @@ class Constraint {
   }
 
   /**
+   * Enables this constraint.
+   */
+  enable() {
+    this._enabled = true;
+  }
+
+  /**
+   * Disables this constraint.
+   */
+  disable() {
+    this._enabled = false;
+  }
+
+  /**
    * Ensures the current state vector meets this constraint.
    *
    * @param {Float32Array} s1 The previous state vector.
    * @param {Float32Array} s2 The current state vector.
    */
   constrain(s1, s2) {
+    if (!this._enabled)
+      return;
     switch (this._type) {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
         for (var i = 0; i < this._p.length; i++) {
@@ -573,10 +720,17 @@ class Constraint {
     }
   }
 
+  /**
+   * Toggles drawing of this constraint, and updates vertices when bounds change.
+   *
+   * @param {number} index The index of this constraint.
+   * @param {boolean} enabled Whether this constraint should be drawn.
+   */
   draw(index, enabled) {
     var r = Math.random();
     var g = Math.random();
     var b = Math.random();
+    enabled = enabled && this._enabled;
     vbo_2.reload(
       new Float32Array([
         this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
@@ -616,5 +770,14 @@ class Constraint {
         this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
       ]),
       index * 7 * 24);
+  }
+
+  /**
+   * Returns a string representation of this constraint.
+   *
+   * @return {String} A concatination of the constraint's type and bounds.
+   */
+  toString() {
+    return "" + this.type + "" + this.bounds;
   }
 }

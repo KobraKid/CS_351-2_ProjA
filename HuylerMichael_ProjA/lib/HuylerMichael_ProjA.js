@@ -263,7 +263,7 @@ function initVBOBoxes() {
  */
 function initParticleSystems() {
   particles = [...Array(PARTICLE_COUNT).keys()];
-  bball.init(0,
+  bball.init(PARTICLE_SYSTEM.BOUNCY_BALL,
     [
       // gravity
       new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, 0, 0, 1, -tracker.gravity, TIMEOUT_NO_TIMEOUT, particles),

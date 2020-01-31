@@ -118,7 +118,7 @@ function keyDown(kev) {
           Math.random() * 2 - 1,
           Math.random() * 2 - 1,
           Math.random() * 2,
-          INIT_VEL * Math.random() * 10,
+          INIT_VEL * Math.random() * 50,
           TIMEOUT_INSTANT,
           [i]));
       }
