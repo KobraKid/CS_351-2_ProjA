@@ -23,6 +23,8 @@ var vbo_0;
 var vbo_1;
 // Ball container visualization
 var vbo_2;
+// Spring visualization
+var vbo_3;
 // Array containing all VBOBoxes
 var vbo_boxes = [];
 
@@ -30,6 +32,7 @@ var vbo_boxes = [];
 var INIT_VEL = 0.15 * 60.0;
 var PARTICLE_COUNT = 100;
 var bball = new PartSys(PARTICLE_COUNT);
+var spring = new PartSys(2);
 
 /**
  * Initialize global variables, event listeners, etc.
@@ -212,8 +215,8 @@ function initVBOBoxes() {
   vbo_1.init();
   vbo_boxes.push(vbo_1);
 
-  var vertex_shader_2 =
-    `precision mediump float;
+  var vertex_shader_2 = `
+    precision mediump float;
 
     uniform mat4 u_model_matrix_2;
     uniform mat4 u_view_matrix_2;
@@ -231,8 +234,8 @@ function initVBOBoxes() {
       v_color_2 = a_color_2;
       v_enabled_2 = a_enabled_2;
     }`;
-  var fragment_shader_2 =
-    `precision mediump float;
+  var fragment_shader_2 = `
+    precision mediump float;
 
     varying vec3 v_color_2;
     varying float v_enabled_2;
@@ -256,6 +259,51 @@ function initVBOBoxes() {
     () => {});
   vbo_2.init();
   vbo_boxes.push(vbo_2);
+
+  var vertex_shader_3 = `
+    precision mediump float;
+
+    uniform mat4 u_model_matrix_3;
+    uniform mat4 u_view_matrix_3;
+    uniform mat4 u_projection_matrix_3;
+
+    attribute vec3 a_position_3;
+    attribute vec3 a_color_3;
+    attribute float a_enabled_3;
+
+    varying vec3 v_color_3;
+    varying float v_enabled_3;
+
+    void main() {
+      gl_Position = u_projection_matrix_3 * u_view_matrix_3 * u_model_matrix_3 * vec4(a_position_3, 1.0);
+      v_color_3 = a_color_3;
+      v_enabled_3 = a_enabled_3;
+    }`;
+  var fragment_shader_3 = `
+    precision mediump float;
+
+    varying vec3 v_color_3;
+    varying float v_enabled_3;
+
+    void main() {
+      if (v_enabled_3 > 0.0) {
+        gl_FragColor = vec4(v_color_3, 1.0);
+      } else { discard; }
+    }`;
+  vbo_3 = new VBOBox(
+    vertex_shader_3,
+    fragment_shader_3,
+    new Float32Array(7 * 24 * 4), // 7 attributes, 1 line, max 4 constraints
+    gl.LINES,
+    7, {
+      'a_position_3': [0, 3],
+      'a_color_3': [3, 3],
+      'a_enabled_3': [6, 1],
+    },
+    3,
+    () => {});
+  vbo_3.init();
+  vbo_boxes.push(vbo_3);
 }
 
 /**
@@ -264,6 +312,7 @@ function initVBOBoxes() {
 function initParticleSystems() {
   particles = [...Array(PARTICLE_COUNT).keys()];
   bball.init(PARTICLE_SYSTEM.BOUNCY_BALL,
+    vbo_1, vbo_2,
     [
       // gravity
       new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, 0, 0, 1, -tracker.gravity, TIMEOUT_NO_TIMEOUT, particles),
@@ -275,8 +324,18 @@ function initParticleSystems() {
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(0, PARTICLE_COUNT / 2), WALL.ALL, -0.9, 0.9, -0.9, 0.9, 0, 1),
     ]
   );
-  bball.constraint_set[0].draw(0, true);
-  bball.constraint_set[1].draw(1, true);
+  bball.constraint_set[0].draw(vbo_2, 0, true);
+  bball.constraint_set[1].draw(vbo_2, 1, true);
+  spring.init(PARTICLE_SYSTEM.BOUNCY_BALL,
+    vbo_1, vbo_3,
+    [
+      // air drag
+      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT, particles),
+    ],
+    [
+      new Constraint(CONSTRAINT_TYPE.STIFF_SPRING, [0, 1]),
+    ]
+  );
 }
 
 /**

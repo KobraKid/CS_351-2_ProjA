@@ -62,6 +62,8 @@ class PartSys {
   constructor(particle_count) {
     this._type = -1;
     this._particle_count = particle_count;
+    this._vbo = null;
+    this._c_vbo = null;
     this._s1 = new Float32Array(particle_count * STATE_SIZE);
     for (var i = 0; i < particle_count * STATE_SIZE; i += STATE_SIZE) {
       this._s1[i + STATE.P_X] = Math.random() * 2 - 1;
@@ -137,19 +139,23 @@ class PartSys {
   /**
    * Sets up a particular particle system, influencing its general behavior.
    *
-   * @param {PARTICLE_SYSTEM} part_sys_type The type of particle system to create.
+   * @param {!PARTICLE_SYSTEM} part_sys_type The type of particle system to create.
    * @param {Array<Force>} force_set The set of initial forces acting on this particle system.
    * @param {Array<Constraint>} constraint_set The set of initial constraints limiting this particle system.
    */
-  init(part_sys_type, force_set, constraint_set) {
+  init(part_sys_type, my_vbo, constraint_vbo, force_set, constraint_set) {
     this._type = part_sys_type;
     this.force_set = force_set;
     this.constraint_set = constraint_set;
+    this._vbo = my_vbo;
+    this._c_vbo = constraint_vbo;
     this.insertGui();
   }
 
   /**
    * Applys all forces in forceArray, modifying state array s.
+   *
+   * @param {!Float32Array} s The state array to be modified.
    */
   applyAllForces(s) {
     for (var i = 0; i < s.length; i += STATE_SIZE) {
@@ -163,6 +169,8 @@ class PartSys {
 
   /**
    * Finds the derivative w.r.t. time of state s.
+   *
+   * @param {!Float32Array} s The state array to apply the derivative to.
    */
   dotFinder(s) {
     var dot = s.slice();
@@ -192,7 +200,7 @@ class PartSys {
   /**
    * Creates s2 by approximating integration of s1 over a single timestep.
    *
-   * @param {SOLVER} solver_type The type of solver to use.
+   * @param {!SOLVER} solver_type The type of solver to use.
    */
   solver(solver_type) {
     switch (solver_type) {
@@ -246,7 +254,7 @@ class PartSys {
   /**
    * Updates values for transferring to the GPU.
    *
-   * @param {VBOBox} box The VBOBox whose VBO should be updated.
+   * @param {!VBOBox} box The VBOBox whose VBO should be updated.
    */
   render(box) {
     // Send to the VBO box to call WebGLRenderingContext.bufferSubData()
@@ -257,8 +265,8 @@ class PartSys {
   /**
    * Swaps two state vectors.
    *
-   * @param {Float32Array} s1 The previous state vector.
-   * @param {Float32Array} s2 The current state vector.
+   * @param {?Float32Array} s1 The previous state vector.
+   * @param {?Float32Array} s2 The current state vector.
    */
   swap(s1, s2) {
     s1.set(s2);
@@ -268,7 +276,7 @@ class PartSys {
    * Adds a new force to the particle system, or replaces the set of forces
    * with a new set if an array is passed in.
    *
-   * @param {Force} f The force to be added to this particle system.
+   * @param {?Force} f The force to be added to this particle system.
    */
   addForce(f) {
     this.force_set = f;
@@ -278,19 +286,37 @@ class PartSys {
    * Adds a new constraint to the particle system, or replaces the set of
    * constraints with a new set if an array is passed in.
    *
-   * @param {Constraint} c The constraint to be added to this particle system.
+   * @param {?Constraint} c The constraint to be added to this particle system.
    */
   addConstraint(c) {
     this.constraint_set.push(c);
   }
 
   /**
-   * Removes
+   * Enables a constraint.
+   *
+   * @param {number} i The index of the constraint to be enabled.
+   */
+  enableConstraint(i) {
+    this.constraint_set[i].enable();
+  }
+
+  /**
+   * Disables a constraint.
+   *
+   * @param {number} i The index of the constraint to be disabled.
    */
   disableConstraint(i) {
     this.constraint_set[i].disable();
   }
 
+  /**
+   * Creates a string representation of a particle system.
+   *
+   * Concatinates the particle count with the set of constraints.
+   *
+   * @return {string} This particle system's text representation.
+   */
   toString() {
     var partSysString = "" + this._particle_count;
     for (var constraint in this.constraint_set) {
@@ -310,7 +336,7 @@ class PartSys {
     // Add a master toggle to hide all of this particle system's constraints
     tracker[hash + "_drawn"] = true;
     partSysFolder.add(tracker, hash + "_drawn").name("Show constraints").onChange(function(value) {
-      this.constraint_set.forEach((constraint, i) => constraint.draw(i, value && tracker["c_" + hash + "_" + hex_sha1(this.constraint_set[i].toString()) + "_drawn"]));
+      this.constraint_set.forEach((constraint, i) => constraint.draw(this._c_vbo, i, value && tracker["c_" + hash + "_" + hex_sha1(this.constraint_set[i].toString()) + "_drawn"]));
     }.bind(this));
 
     // Add controls for each constraint individually
@@ -324,62 +350,69 @@ class PartSys {
       // Toggle drawing this constraint
       tracker[attr + "_drawn"] = true;
       partSysFolder.add(tracker, attr + "_drawn").name("Visible").onChange(function(value) {
-        this.constraint_set[i].draw(i, value && tracker[hash + "_drawn"]);
+        this.constraint_set[i].draw(this._c_vbo, i, value && tracker[hash + "_drawn"]);
       }.bind(this));
 
-      // Adjust this constraint's bounds
-      tracker[attr + "_x_min"] = this.constraint_set[i].bounds[0];
-      constraintSubFolder.add(tracker, attr + "_x_min").name("x-min").onChange(function() {
-        if (tracker[attr + "_x_min"] >= tracker[attr + "_x_max"]) {
-          tracker[attr + "_x_min"] = tracker[attr + "_x_max"] - 0.1;
-        }
-        this.constraint_set[i].x_min = tracker[attr + "_x_min"];
-        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-      }.bind(this));
-      tracker[attr + "_x_max"] = this.constraint_set[i].bounds[1];
-      constraintSubFolder.add(tracker, attr + "_x_max").name("x-max").onChange(function() {
-        if (tracker[attr + "_x_max"] <= tracker[attr + "_x_min"]) {
-          tracker[attr + "_x_max"] = tracker[attr + "_x_min"] + 0.1;
-        }
-        this.constraint_set[i].x_max = tracker[attr + "_x_max"];
-        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-      }.bind(this));
-      tracker[attr + "_y_min"] = this.constraint_set[i].bounds[2];
-      constraintSubFolder.add(tracker, attr + "_y_min").name("y-min").onChange(function() {
-        if (tracker[attr + "_y_min"] >= tracker[attr + "_y_max"]) {
-          tracker[attr + "_y_min"] = tracker[attr + "_y_max"] - 0.1;
-        }
-        this.constraint_set[i].y_min = tracker[attr + "_y_min"];
-        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-      }.bind(this));
-      tracker[attr + "_y_max"] = this.constraint_set[i].bounds[3];
-      constraintSubFolder.add(tracker, attr + "_y_max").name("y-max").onChange(function() {
-        if (tracker[attr + "_y_max"] <= tracker[attr + "_y_min"]) {
-          tracker[attr + "_y_max"] = tracker[attr + "_y_min"] + 0.1;
-        }
-        this.constraint_set[i].y_max = tracker[attr + "_y_max"];
-        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-      }.bind(this));
-      tracker[attr + "_z_min"] = this.constraint_set[i].bounds[4];
-      constraintSubFolder.add(tracker, attr + "_z_min").name("z-min").onChange(function() {
-        if (tracker[attr + "_z_min"] >= tracker[attr + "_z_max"]) {
-          tracker[attr + "_z_min"] = tracker[attr + "_z_max"] - 0.1;
-        }
-        this.constraint_set[i].z_min = tracker[attr + "_z_min"];
-        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-      }.bind(this));
-      tracker[attr + "_z_max"] = this.constraint_set[i].bounds[5];
-      constraintSubFolder.add(tracker, attr + "_z_max").name("z-max").onChange(function() {
-        if (tracker[attr + "_z_max"] <= tracker[attr + "_z_min"]) {
-          tracker[attr + "_z_max"] = tracker[attr + "_z_min"] + 0.1;
-        }
-        this.constraint_set[i].z_max = tracker[attr + "_z_max"];
-        this.constraint_set[i].draw(i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-      }.bind(this));
-      tracker[attr + "_enabled"] = true;
-      constraintSubFolder.add(tracker, attr + "_enabled").name("Enabled").onChange(function(value) {
-        value ? this.constraint_set[i].enable() : this.constraint_set[i].disable();
-      }.bind(this));
+      switch (this.constraint_set[i].type) {
+        case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
+        case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
+          // Adjust this constraint's bounds
+          tracker[attr + "_x_min"] = this.constraint_set[i].bounds[0];
+          constraintSubFolder.add(tracker, attr + "_x_min").name("x-min").onChange(function() {
+            if (tracker[attr + "_x_min"] >= tracker[attr + "_x_max"]) {
+              tracker[attr + "_x_min"] = tracker[attr + "_x_max"] - 0.1;
+            }
+            this.constraint_set[i].x_min = tracker[attr + "_x_min"];
+            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+          }.bind(this));
+          tracker[attr + "_x_max"] = this.constraint_set[i].bounds[1];
+          constraintSubFolder.add(tracker, attr + "_x_max").name("x-max").onChange(function() {
+            if (tracker[attr + "_x_max"] <= tracker[attr + "_x_min"]) {
+              tracker[attr + "_x_max"] = tracker[attr + "_x_min"] + 0.1;
+            }
+            this.constraint_set[i].x_max = tracker[attr + "_x_max"];
+            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+          }.bind(this));
+          tracker[attr + "_y_min"] = this.constraint_set[i].bounds[2];
+          constraintSubFolder.add(tracker, attr + "_y_min").name("y-min").onChange(function() {
+            if (tracker[attr + "_y_min"] >= tracker[attr + "_y_max"]) {
+              tracker[attr + "_y_min"] = tracker[attr + "_y_max"] - 0.1;
+            }
+            this.constraint_set[i].y_min = tracker[attr + "_y_min"];
+            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+          }.bind(this));
+          tracker[attr + "_y_max"] = this.constraint_set[i].bounds[3];
+          constraintSubFolder.add(tracker, attr + "_y_max").name("y-max").onChange(function() {
+            if (tracker[attr + "_y_max"] <= tracker[attr + "_y_min"]) {
+              tracker[attr + "_y_max"] = tracker[attr + "_y_min"] + 0.1;
+            }
+            this.constraint_set[i].y_max = tracker[attr + "_y_max"];
+            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+          }.bind(this));
+          tracker[attr + "_z_min"] = this.constraint_set[i].bounds[4];
+          constraintSubFolder.add(tracker, attr + "_z_min").name("z-min").onChange(function() {
+            if (tracker[attr + "_z_min"] >= tracker[attr + "_z_max"]) {
+              tracker[attr + "_z_min"] = tracker[attr + "_z_max"] - 0.1;
+            }
+            this.constraint_set[i].z_min = tracker[attr + "_z_min"];
+            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+          }.bind(this));
+          tracker[attr + "_z_max"] = this.constraint_set[i].bounds[5];
+          constraintSubFolder.add(tracker, attr + "_z_max").name("z-max").onChange(function() {
+            if (tracker[attr + "_z_max"] <= tracker[attr + "_z_min"]) {
+              tracker[attr + "_z_max"] = tracker[attr + "_z_min"] + 0.1;
+            }
+            this.constraint_set[i].z_max = tracker[attr + "_z_max"];
+            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+          }.bind(this));
+          tracker[attr + "_enabled"] = true;
+          constraintSubFolder.add(tracker, attr + "_enabled").name("Enabled").onChange(function(value) {
+            value ? this.constraint_set[i].enable() : this.constraint_set[i].disable();
+          }.bind(this));
+          break;
+        default:
+          break;
+      }
     }
   }
 }
@@ -408,7 +441,7 @@ var TIMEOUT_INSTANT = 1;
  */
 class Force {
   /**
-   * @param {FORCE_TYPE} type The type of force to implement.
+   * @param {!FORCE_TYPE} type The type of force to implement.
    * @param {number} x The x component of the force vector.
    * @param {number} y The y component of the force vector.
    * @param {number} z The z component of the force vector.
@@ -441,7 +474,7 @@ class Force {
   /**
    * Applies this force to a given state vector.
    *
-   * @param {Float32Array} s The state vector to apply this force to.
+   * @param {!Float32Array} s The state vector to apply this force to.
    */
   apply(s) {
     switch (this._type) {
@@ -525,12 +558,12 @@ const WALL = {
  */
 class Constraint {
   /**
-   * @param {CONSTRAINT_TYPE} type The type of constraint to represent.
+   * @param {!CONSTRAINT_TYPE} type The type of constraint to represent.
    * @param {Array<number>} affected_particles The list of particles to constrain.
-   * @param {WALL} enabled_walls The walls to enable for this constraint.
+   * @param {!WALL=} enabled_walls The walls to enable for this constraint.
    * @param {...number} bounds The rest of the arguments are all numbers which bound the constraint.
    */
-  constructor(type, affected_particles, enabled_walls, ...bounds) {
+  constructor(type, affected_particles, enabled_walls = WALL.NONE, ...bounds) {
     this._type = type;
     switch (this._type) {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
@@ -613,8 +646,8 @@ class Constraint {
   /**
    * Ensures the current state vector meets this constraint.
    *
-   * @param {Float32Array} s1 The previous state vector.
-   * @param {Float32Array} s2 The current state vector.
+   * @param {!Float32Array} s1 The previous state vector.
+   * @param {!Float32Array} s2 The current state vector.
    */
   constrain(s1, s2) {
     if (!this._enabled)
@@ -723,15 +756,16 @@ class Constraint {
   /**
    * Toggles drawing of this constraint, and updates vertices when bounds change.
    *
+   * @param {!VBOBox} vbo The VBO to update.
    * @param {number} index The index of this constraint.
    * @param {boolean} enabled Whether this constraint should be drawn.
    */
-  draw(index, enabled) {
+  draw(vbo, index, enabled) {
     var r = Math.random();
     var g = Math.random();
     var b = Math.random();
     enabled = enabled && this._enabled;
-    vbo_2.reload(
+    vbo.reload(
       new Float32Array([
         this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
         this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
@@ -775,7 +809,7 @@ class Constraint {
   /**
    * Returns a string representation of this constraint.
    *
-   * @return {String} A concatination of the constraint's type and bounds.
+   * @return {string} A concatination of the constraint's type and bounds.
    */
   toString() {
     return "" + this.type + "" + this.bounds;

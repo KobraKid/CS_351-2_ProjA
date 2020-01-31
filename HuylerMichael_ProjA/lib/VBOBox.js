@@ -22,10 +22,10 @@ var theta = 3.14;
  */
 class VBOBox {
   /**
-   * @param {String} VERTEX_SHADER The vertex shader for this box.
-   * @param {String} FRAGMENT_SHADER The fragment shader for this box.
-   * @param {Float32Array} vertex_array An array of vertices to be loaded into the VBO.
-   * @param {GLenum} draw_method The mode to be used when calling WebGLRenderingContext.drawArrays().
+   * @param {string} VERTEX_SHADER The vertex shader for this box.
+   * @param {string} FRAGMENT_SHADER The fragment shader for this box.
+   * @param {!Float32Array} vertex_array An array of vertices to be loaded into the VBO.
+   * @param {!GLenum} draw_method The mode to be used when calling WebGLRenderingContext.drawArrays().
    * @param {number} attribute_count The number of attributes each vertex has.
    * @param {[string: number]} attributes A dictionary of attributes stored in the VBO, where keys are the
    *        attribute names, and values are how many floats are stared in the VBO for the given attribute.
@@ -82,6 +82,9 @@ class VBOBox {
     this.custom_adjust = adjust_function;
   }
 
+  get index() {
+    return this.box_num;
+  }
   get model_matrix() {
     return this._model_matrix;
   }
@@ -244,8 +247,13 @@ class VBOBox {
    *
    * Useful if independent vertices should move. Modifications to this VBOBox's
    * vbo array will be substituted into the GPU's VBO.
+   *
+   * @param {!Float32Array} data The data to sub into the VBO.
+   * @param {number=} index The index to start substituting data at.
    */
   reload(data, index = 0) {
+    gl.useProgram(this.shader_loc);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo_loc);
     gl.bufferSubData(gl.ARRAY_BUFFER, index * this.FSIZE, data);
   }
 }
