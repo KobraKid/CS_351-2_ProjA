@@ -65,12 +65,19 @@ function main() {
     mouseUp(ev)
   };
   window.addEventListener("keydown", keyDown, false);
+  window.addEventListener("keyup", keyUp, false);
 
   initGui();
   initVBOBoxes();
   initParticleSystems();
 
+  var shouldUpdateKeypress = 0;
   var tick = function() {
+    if (shouldUpdateKeypress >= 3) {
+      updateKeypresses();
+      shouldUpdateKeypress = 0;
+    }
+    shouldUpdateKeypress++;
     requestAnimationFrame(tick, canvas);
     updateAll();
     drawAll();

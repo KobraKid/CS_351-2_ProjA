@@ -7,6 +7,8 @@
  * @author Michael Huyler
  */
 
+keysPressed = {};
+
 /**
  * Handles keypress events.
  */
@@ -17,115 +19,133 @@ function keyDown(kev) {
   } else {
     code = kev.code;
   }
-  switch (code) {
-    case "KeyP":
-    case "80":
-      tracker.pause = !tracker.pause;
-      break;
-    case "KeyC":
-    case "67":
-      tracker.clear = !tracker.clear;
-      break;
-    case "KeyW":
-    case "87":
-      var D = [
-        (g_perspective_lookat[0] - g_perspective_eye[0]) * 0.5,
-        (g_perspective_lookat[1] - g_perspective_eye[1]) * 0.5,
-        (g_perspective_lookat[2] - g_perspective_eye[2]) * 0.5,
-      ];
-      g_perspective_eye[0] += D[0];
-      g_perspective_lookat[0] += D[0];
-      g_perspective_eye[1] += D[1];
-      g_perspective_lookat[1] += D[1];
-      g_perspective_eye[2] += D[2];
-      g_perspective_lookat[2] += D[2];
-      break;
-    case "KeyA":
-    case "65":
-      var D = [
-        g_perspective_lookat[0] - g_perspective_eye[0],
-        g_perspective_lookat[1] - g_perspective_eye[1],
-        0
-      ];
-      // Cross Product
-      var C = [
-        (D[1] * 1 - D[2] * 0) * 0.5,
-        (D[2] * 0 - D[0] * 1) * 0.5,
-        0 // (D[0] * 0 - D[1] * 0) * 0.5
-      ];
-      g_perspective_eye[0] -= C[0];
-      g_perspective_lookat[0] -= C[0];
-      g_perspective_eye[1] -= C[1];
-      g_perspective_lookat[1] -= C[1];
-      break;
-    case "KeyS":
-    case "83":
-      var D = [
-        (g_perspective_lookat[0] - g_perspective_eye[0]) * 0.5,
-        (g_perspective_lookat[1] - g_perspective_eye[1]) * 0.5,
-        (g_perspective_lookat[2] - g_perspective_eye[2]) * 0.5,
-      ];
-      g_perspective_eye[0] -= D[0];
-      g_perspective_lookat[0] -= D[0];
-      g_perspective_eye[1] -= D[1];
-      g_perspective_lookat[1] -= D[1];
-      g_perspective_eye[2] -= D[2];
-      g_perspective_lookat[2] -= D[2];
-      break;
-    case "KeyD":
-    case "68":
-      var D = [
-        g_perspective_lookat[0] - g_perspective_eye[0],
-        g_perspective_lookat[1] - g_perspective_eye[1],
-        0
-      ];
-      // Cross Product
-      var C = [
-        (D[1] * 1 - D[2] * 0) * 0.5,
-        (D[2] * 0 - D[0] * 1) * 0.5,
-        0 // (D[0] * 0 - D[1] * 0) * 0.5
-      ];
-      g_perspective_eye[0] += C[0];
-      g_perspective_lookat[0] += C[0];
-      g_perspective_eye[1] += C[1];
-      g_perspective_lookat[1] += C[1];
-      break;
-    case "KeyI":
-    case "73":
-      g_perspective_lookat[2] += 0.05;
-      break;
-    case "KeyJ":
-    case "74":
-      theta += 0.05;
-      g_perspective_lookat[0] = g_perspective_eye[0] + Math.cos(theta);
-      g_perspective_lookat[1] = g_perspective_eye[1] + Math.sin(theta);
-      break;
-    case "KeyK":
-    case "75":
-      g_perspective_lookat[2] -= 0.05;
-      break;
-    case "KeyL":
-    case "76":
-      theta -= 0.05;
-      g_perspective_lookat[0] = g_perspective_eye[0] + Math.cos(theta);
-      g_perspective_lookat[1] = g_perspective_eye[1] + Math.sin(theta);
-      break;
-    case "Space":
-    case "32":
-      for (var i = 0; i < PARTICLE_COUNT; i++) {
-        bball.addForce(new Force(
-          FORCE_TYPE.FORCE_WIND,
-          Math.random() * 2 - 1,
-          Math.random() * 2 - 1,
-          Math.random() * 2,
-          INIT_VEL * Math.random() * 50,
-          TIMEOUT_INSTANT,
-          [i]));
-      }
-      break;
-    default:
-      console.log("Unused key: " + code);
-      break;
+  keysPressed[code] = true;
+}
+
+function keyUp(kev) {
+  var code;
+  if (!kev.code) {
+    code = "" + kev.keyCode;
+  } else {
+    code = kev.code;
+  }
+  keysPressed[code] = false;
+}
+
+function updateKeypresses() {
+  for (var key in keysPressed) {
+    if (!keysPressed[key])
+      continue;
+    switch (key) {
+      case "KeyP":
+      case "80":
+        tracker.pause = !tracker.pause;
+        break;
+      case "KeyC":
+      case "67":
+        tracker.clear = !tracker.clear;
+        break;
+      case "KeyW":
+      case "87":
+        var D = [
+          (g_perspective_lookat[0] - g_perspective_eye[0]) * 0.5,
+          (g_perspective_lookat[1] - g_perspective_eye[1]) * 0.5,
+          (g_perspective_lookat[2] - g_perspective_eye[2]) * 0.5,
+        ];
+        g_perspective_eye[0] += D[0];
+        g_perspective_lookat[0] += D[0];
+        g_perspective_eye[1] += D[1];
+        g_perspective_lookat[1] += D[1];
+        g_perspective_eye[2] += D[2];
+        g_perspective_lookat[2] += D[2];
+        break;
+      case "KeyA":
+      case "65":
+        var D = [
+          g_perspective_lookat[0] - g_perspective_eye[0],
+          g_perspective_lookat[1] - g_perspective_eye[1],
+          0
+        ];
+        // Cross Product
+        var C = [
+          (D[1] * 1 - D[2] * 0) * 0.5,
+          (D[2] * 0 - D[0] * 1) * 0.5,
+          0 // (D[0] * 0 - D[1] * 0) * 0.5
+        ];
+        g_perspective_eye[0] -= C[0];
+        g_perspective_lookat[0] -= C[0];
+        g_perspective_eye[1] -= C[1];
+        g_perspective_lookat[1] -= C[1];
+        break;
+      case "KeyS":
+      case "83":
+        var D = [
+          (g_perspective_lookat[0] - g_perspective_eye[0]) * 0.5,
+          (g_perspective_lookat[1] - g_perspective_eye[1]) * 0.5,
+          (g_perspective_lookat[2] - g_perspective_eye[2]) * 0.5,
+        ];
+        g_perspective_eye[0] -= D[0];
+        g_perspective_lookat[0] -= D[0];
+        g_perspective_eye[1] -= D[1];
+        g_perspective_lookat[1] -= D[1];
+        g_perspective_eye[2] -= D[2];
+        g_perspective_lookat[2] -= D[2];
+        break;
+      case "KeyD":
+      case "68":
+        var D = [
+          g_perspective_lookat[0] - g_perspective_eye[0],
+          g_perspective_lookat[1] - g_perspective_eye[1],
+          0
+        ];
+        // Cross Product
+        var C = [
+          (D[1] * 1 - D[2] * 0) * 0.5,
+          (D[2] * 0 - D[0] * 1) * 0.5,
+          0 // (D[0] * 0 - D[1] * 0) * 0.5
+        ];
+        g_perspective_eye[0] += C[0];
+        g_perspective_lookat[0] += C[0];
+        g_perspective_eye[1] += C[1];
+        g_perspective_lookat[1] += C[1];
+        break;
+      case "KeyI":
+      case "73":
+        g_perspective_lookat[2] += 0.05;
+        break;
+      case "KeyJ":
+      case "74":
+        theta += 0.05;
+        g_perspective_lookat[0] = g_perspective_eye[0] + Math.cos(theta);
+        g_perspective_lookat[1] = g_perspective_eye[1] + Math.sin(theta);
+        break;
+      case "KeyK":
+      case "75":
+        g_perspective_lookat[2] -= 0.05;
+        break;
+      case "KeyL":
+      case "76":
+        theta -= 0.05;
+        g_perspective_lookat[0] = g_perspective_eye[0] + Math.cos(theta);
+        g_perspective_lookat[1] = g_perspective_eye[1] + Math.sin(theta);
+        break;
+      case "Space":
+      case "32":
+        for (var i = 0; i < PARTICLE_COUNT; i++) {
+          bball.addForce(new Force(
+            FORCE_TYPE.FORCE_WIND,
+            Math.random() * 2 - 1,
+            Math.random() * 2 - 1,
+            Math.random() * 2,
+            INIT_VEL * Math.random() * 10,
+            TIMEOUT_INSTANT,
+            [i]));
+        }
+        break;
+      default:
+        // console.log("Unused key: " + key);
+        break;
+    }
   }
 }
 
