@@ -76,8 +76,8 @@ function initGui() {
   });
   gui.add(tracker, 'clear').name('Clear screen?').listen();
   gui.add(tracker, 'pause').name('Pause').listen();
-  if (!gui_open)
-    gui.open();
+  if (gui_open)
+    gui.close();
   document.getElementsByClassName('close-bottom')[0].onclick = function() {
     gui_open = !gui_open;
   };
@@ -102,5 +102,3 @@ function toggle_help() {
   document.getElementById("help-menu-expanded").style.visibility = help_visible ? "visible" : "hidden";
   document.getElementById("help-menu").innerHTML = help_visible ? "Hide Help" : "Show Help";
 }
-
-toggle_help();

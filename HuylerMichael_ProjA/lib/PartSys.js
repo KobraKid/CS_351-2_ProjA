@@ -57,15 +57,15 @@ const SOLVER = {
  */
 class PartSys {
   /**
-   * @param {number} particle_count The number of particles to initialize.
+   * @param {number} BBALL_PARTICLE_COUNT The number of particles to initialize.
    */
-  constructor(particle_count) {
+  constructor(BBALL_PARTICLE_COUNT) {
     this._type = -1;
-    this._particle_count = particle_count;
+    this._BBALL_PARTICLE_COUNT = BBALL_PARTICLE_COUNT;
     this._vbo = null;
     this._c_vbo = null;
-    this._s1 = new Float32Array(particle_count * STATE_SIZE);
-    for (var i = 0; i < particle_count * STATE_SIZE; i += STATE_SIZE) {
+    this._s1 = new Float32Array(BBALL_PARTICLE_COUNT * STATE_SIZE);
+    for (var i = 0; i < BBALL_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
       this._s1[i + STATE.P_X] = Math.random() * 2 - 1;
       this._s1[i + STATE.P_Y] = Math.random() * 2 - 1;
       this._s1[i + STATE.P_Z] = Math.random() * 2;
@@ -255,11 +255,12 @@ class PartSys {
    * Updates values for transferring to the GPU.
    *
    * @param {!VBOBox} box The VBOBox whose VBO should be updated.
+   * @param {number=} index The index to start substituting data at.
    */
-  render(box) {
+  render(box, index = 0) {
     // Send to the VBO box to call WebGLRenderingContext.bufferSubData()
     box.vbo = this.s2;
-    box.reload(box.vbo);
+    box.reload(box.vbo, index);
   }
 
   /**
@@ -318,7 +319,7 @@ class PartSys {
    * @return {string} This particle system's text representation.
    */
   toString() {
-    var partSysString = "" + this._particle_count;
+    var partSysString = "" + this._BBALL_PARTICLE_COUNT;
     for (var constraint in this.constraint_set) {
       partSysString += constraint.toString();
     }
@@ -442,13 +443,14 @@ var TIMEOUT_INSTANT = 1;
 class Force {
   /**
    * @param {!FORCE_TYPE} type The type of force to implement.
+   * @param {Array<number>} affected_particles The list of affected particles.
+   * @param {number} magnitude The magnitude of the force vector.
+   * @param {number} timeout How long the force should last.
    * @param {number} x The x component of the force vector.
    * @param {number} y The y component of the force vector.
    * @param {number} z The z component of the force vector.
-   * @param {number} magnitude The magnitude of the force vector.
-   * @param {number} timeout How long the force should last.
    */
-  constructor(type, x, y, z, magnitude, timeout, affected_particles) {
+  constructor(type, affected_particles, magnitude, timeout = TIMEOUT_NO_TIMEOUT, x = 1, y = 1, z = 1) {
     this._type = type;
     this._x = x;
     this._y = y;
@@ -496,6 +498,14 @@ class Force {
           s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += this.y * this.magnitude * Math.random();
           s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += this.z * this.magnitude * Math.random();
         }
+        break;
+      case FORCE_TYPE.FORCE_SPRING:
+        s[(this._p[0] * STATE_SIZE) + STATE.F_X] += this.magnitude;
+        s[(this._p[0] * STATE_SIZE) + STATE.F_Y] += this.magnitude;
+        s[(this._p[0] * STATE_SIZE) + STATE.F_Z] += this.magnitude;
+        s[(this._p[1] * STATE_SIZE) + STATE.F_X] += this.magnitude;
+        s[(this._p[1] * STATE_SIZE) + STATE.F_Y] += this.magnitude;
+        s[(this._p[1] * STATE_SIZE) + STATE.F_Z] += this.magnitude;
         break;
       default:
         console.log("Unimplemented force type: " + this._type);

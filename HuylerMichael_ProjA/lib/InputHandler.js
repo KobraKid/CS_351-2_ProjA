@@ -131,15 +131,15 @@ function updateKeypresses() {
         break;
       case "Space":
       case "32":
-        for (var i = 0; i < PARTICLE_COUNT; i++) {
+        for (var i = 0; i < BBALL_PARTICLE_COUNT; i++) {
           bball.addForce(new Force(
             FORCE_TYPE.FORCE_WIND,
-            Math.random() * 2 - 1,
-            Math.random() * 2 - 1,
-            Math.random() * 2,
-            INIT_VEL * Math.random() * 10,
+            [i],
+            INIT_VEL * Math.random() * 60,
             TIMEOUT_INSTANT,
-            [i]));
+            Math.random() * 2 - 1,
+            Math.random() * 2 - 1,
+            Math.random() * 2));
         }
         break;
       default:

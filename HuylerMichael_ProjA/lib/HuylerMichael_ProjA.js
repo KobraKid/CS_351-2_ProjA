@@ -30,8 +30,8 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var PARTICLE_COUNT = 100;
-var bball = new PartSys(PARTICLE_COUNT);
+var BBALL_PARTICLE_COUNT = 5;
+var bball = new PartSys(BBALL_PARTICLE_COUNT);
 var spring = new PartSys(2);
 
 /**
@@ -202,7 +202,7 @@ function initVBOBoxes() {
   vbo_1 = new VBOBox(
     vertex_shader_1,
     fragment_shader_1,
-    new Float32Array(PARTICLE_COUNT * STATE_SIZE),
+    new Float32Array((BBALL_PARTICLE_COUNT + 2) * STATE_SIZE),
     gl.POINTS,
     STATE_SIZE, {
       'a_position_1': [0, 3],
@@ -217,6 +217,13 @@ function initVBOBoxes() {
         bball.doConstraints();
         bball.render(vbo_1);
         bball.swap(bball.s1, bball.s2);
+
+        spring.applyAllForces(spring.s1);
+        spring.s1dot = spring.dotFinder(spring.s1);
+        spring.solver(Number(tracker.solver));
+        spring.doConstraints();
+        spring.render(vbo_1, BBALL_PARTICLE_COUNT * STATE_SIZE);
+        spring.swap(spring.s1, spring.s2);
       }
     });
   vbo_1.init();
@@ -255,7 +262,7 @@ function initVBOBoxes() {
   vbo_2 = new VBOBox(
     vertex_shader_2,
     fragment_shader_2,
-    new Float32Array(7 * 24 * 4), // 7 attributes, 12 lines, max 4 constraints
+    new Float32Array(7 * 24 * 4), // 7 attributes, 24 lines, max 4 constraints
     gl.LINES,
     7, {
       'a_position_2': [0, 3],
@@ -317,32 +324,37 @@ function initVBOBoxes() {
  * Initializes all of the particle systems.
  */
 function initParticleSystems() {
-  particles = [...Array(PARTICLE_COUNT).keys()];
+  particles = [...Array(BBALL_PARTICLE_COUNT).keys()];
   bball.init(PARTICLE_SYSTEM.BOUNCY_BALL,
     vbo_1, vbo_2,
     [
       // gravity
-      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, 0, 0, 1, -tracker.gravity, TIMEOUT_NO_TIMEOUT, particles),
+      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles, -tracker.gravity),
       // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT, particles),
+      new Force(FORCE_TYPE.FORCE_DRAG, particles, tracker.drag),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(PARTICLE_COUNT / 2, PARTICLE_COUNT), WALL.ALL, -1, 1, -1, 1, 1, 2),
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(0, PARTICLE_COUNT / 2), WALL.ALL, -0.9, 0.9, -0.9, 0.9, 0, 1),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(0, BBALL_PARTICLE_COUNT), WALL.ALL, -1, 1, -1, 1, 0, 0.975),
     ]
   );
-  bball.constraint_set[0].draw(vbo_2, 0, true);
-  bball.constraint_set[1].draw(vbo_2, 1, true);
+  bball.constraint_set[0].draw(bball._c_vbo, 0, true);
+  var k_s = 1; // spring constant
   spring.init(PARTICLE_SYSTEM.BOUNCY_BALL,
     vbo_1, vbo_3,
     [
+      // gravity
+      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, [0, 1], -tracker.gravity),
       // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, 1, 1, 1, tracker.drag, TIMEOUT_NO_TIMEOUT, particles),
+      new Force(FORCE_TYPE.FORCE_DRAG, [0, 1], tracker.drag),
+      // spring
+      new Force(FORCE_TYPE.FORCE_SPRING, [0, 1], k_s),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.STIFF_SPRING, [0, 1]),
+      // new Constraint(CONSTRAINT_TYPE.STIFF_SPRING, [0, 1]),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(0, 2), WALL.ALL, -1, 1, -1, 1, 1.025, 2),
     ]
   );
+  spring.constraint_set[0].draw(spring._c_vbo, 0, true);
 }
 
 /**
