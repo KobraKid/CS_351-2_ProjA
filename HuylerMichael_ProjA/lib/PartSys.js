@@ -444,20 +444,12 @@ class Force {
   /**
    * @param {!FORCE_TYPE} type The type of force to implement.
    * @param {Array<number>} affected_particles The list of affected particles.
-   * @param {number} magnitude The magnitude of the force vector.
    * @param {number} timeout How long the force should last.
-   * @param {number} x The x component of the force vector.
-   * @param {number} y The y component of the force vector.
-   * @param {number} z The z component of the force vector.
    */
-  constructor(type, affected_particles, magnitude, timeout = TIMEOUT_NO_TIMEOUT, x = 1, y = 1, z = 1) {
+  constructor(type, affected_particles, timeout = TIMEOUT_NO_TIMEOUT) {
     this._type = type;
-    this._x = x;
-    this._y = y;
-    this._z = z;
-    this._magnitude = magnitude;
-    this._t = timeout;
     this._p = affected_particles;
+    this._t = timeout;
   }
 
   get x() {
@@ -471,6 +463,43 @@ class Force {
   }
   get magnitude() {
     return this._magnitude;
+  }
+
+  set x(new_x) {
+    this._x = new_x;
+  }
+  set y(new_y) {
+    this._y = new_y;
+  }
+  set z(new_z) {
+    this._z = new_z;
+  }
+  set magnitude(new_mag) {
+    this._magnitude = new_mag;
+  }
+
+  /**
+   * @param {number} magnitude The magnitude of the force vector.
+   * @param {number} x The x component of the force vector.
+   * @param {number} y The y component of the force vector.
+   * @param {number} z The z component of the force vector.
+   */
+  init_vectored(magnitude = 1, x = 1, y = 1, z = 1) {
+    this._magnitude = magnitude;
+    this._x = x;
+    this._y = y;
+    this._z = z;
+    return this;
+  }
+
+  init_spring(k, length) {
+    this._k = k;
+    this._lr = length;
+    return this;
+  }
+
+  init_boid() {
+    return this;
   }
 
   /**
@@ -500,12 +529,15 @@ class Force {
         }
         break;
       case FORCE_TYPE.FORCE_SPRING:
-        s[(this._p[0] * STATE_SIZE) + STATE.F_X] += this.magnitude;
-        s[(this._p[0] * STATE_SIZE) + STATE.F_Y] += this.magnitude;
-        s[(this._p[0] * STATE_SIZE) + STATE.F_Z] += this.magnitude;
-        s[(this._p[1] * STATE_SIZE) + STATE.F_X] += this.magnitude;
-        s[(this._p[1] * STATE_SIZE) + STATE.F_Y] += this.magnitude;
-        s[(this._p[1] * STATE_SIZE) + STATE.F_Z] += this.magnitude;
+        var Lx = s[(this._p[1] * STATE_SIZE) + STATE.P_X] - s[(this._p[0] * STATE_SIZE) + STATE.P_X] - this._lr;
+        var Ly = s[(this._p[1] * STATE_SIZE) + STATE.P_Y] - s[(this._p[0] * STATE_SIZE) + STATE.P_Y] - this._lr;
+        var Lz = s[(this._p[1] * STATE_SIZE) + STATE.P_Z] - s[(this._p[0] * STATE_SIZE) + STATE.P_Z] - this._lr;
+        s[(this._p[0] * STATE_SIZE) + STATE.F_X] += this._k * Lx;
+        s[(this._p[0] * STATE_SIZE) + STATE.F_Y] += this._k * Ly;
+        s[(this._p[0] * STATE_SIZE) + STATE.F_Z] += this._k * Lz;
+        s[(this._p[1] * STATE_SIZE) + STATE.F_X] += -1 * this._k * Lx;
+        s[(this._p[1] * STATE_SIZE) + STATE.F_Y] += -1 * this._k * Ly;
+        s[(this._p[1] * STATE_SIZE) + STATE.F_Z] += -1 * this._k * Lz;
         break;
       default:
         console.log("Unimplemented force type: " + this._type);

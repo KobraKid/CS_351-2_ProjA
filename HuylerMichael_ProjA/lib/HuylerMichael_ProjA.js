@@ -32,7 +32,8 @@ var vbo_boxes = [];
 var INIT_VEL = 0.15 * 60.0;
 var BBALL_PARTICLE_COUNT = 5;
 var bball = new PartSys(BBALL_PARTICLE_COUNT);
-var spring = new PartSys(2);
+var SPRING_PARTICLE_COUNT = 4;
+var spring = new PartSys(SPRING_PARTICLE_COUNT);
 
 /**
  * Initialize global variables, event listeners, etc.
@@ -202,7 +203,7 @@ function initVBOBoxes() {
   vbo_1 = new VBOBox(
     vertex_shader_1,
     fragment_shader_1,
-    new Float32Array((BBALL_PARTICLE_COUNT + 2) * STATE_SIZE),
+    new Float32Array((BBALL_PARTICLE_COUNT + SPRING_PARTICLE_COUNT) * STATE_SIZE),
     gl.POINTS,
     STATE_SIZE, {
       'a_position_1': [0, 3],
@@ -324,34 +325,42 @@ function initVBOBoxes() {
  * Initializes all of the particle systems.
  */
 function initParticleSystems() {
+  // Particle System 1
   particles = [...Array(BBALL_PARTICLE_COUNT).keys()];
   bball.init(PARTICLE_SYSTEM.BOUNCY_BALL,
     vbo_1, vbo_2,
     [
       // gravity
-      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles, -tracker.gravity),
+      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
       // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, particles, tracker.drag),
+      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(0, BBALL_PARTICLE_COUNT), WALL.ALL, -1, 1, -1, 1, 0, 0.975),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -1, 1, 0, 0.975),
     ]
   );
   bball.constraint_set[0].draw(bball._c_vbo, 0, true);
-  var k_s = 1; // spring constant
+
+  // Particle System 2
+  particles = [...Array(SPRING_PARTICLE_COUNT).keys()];
+  var k_s = 10; // spring constant
   spring.init(PARTICLE_SYSTEM.BOUNCY_BALL,
     vbo_1, vbo_3,
     [
       // gravity
-      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, [0, 1], -tracker.gravity),
+      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, [0, 1]).init_vectored(-tracker.gravity),
       // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, [0, 1], tracker.drag),
+      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // spring
-      new Force(FORCE_TYPE.FORCE_SPRING, [0, 1], k_s),
+      new Force(FORCE_TYPE.FORCE_SPRING, [0, 1]).init_spring(k_s, 0.15),
+      new Force(FORCE_TYPE.FORCE_SPRING, [0, 2]).init_spring(k_s, 0.15),
+      new Force(FORCE_TYPE.FORCE_SPRING, [1, 2]).init_spring(k_s, 0.15),
+      new Force(FORCE_TYPE.FORCE_SPRING, [0, 3]).init_spring(k_s, 0.15),
+      new Force(FORCE_TYPE.FORCE_SPRING, [1, 3]).init_spring(k_s, 0.15),
+      new Force(FORCE_TYPE.FORCE_SPRING, [2, 3]).init_spring(k_s, 0.15),
     ],
     [
-      // new Constraint(CONSTRAINT_TYPE.STIFF_SPRING, [0, 1]),
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles.slice(0, 2), WALL.ALL, -1, 1, -1, 1, 1.025, 2),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -1, 1, 1.025, 2),
     ]
   );
   spring.constraint_set[0].draw(spring._c_vbo, 0, true);
