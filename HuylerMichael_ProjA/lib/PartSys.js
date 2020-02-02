@@ -529,15 +529,24 @@ class Force {
         }
         break;
       case FORCE_TYPE.FORCE_SPRING:
-        var Lx = s[(this._p[1] * STATE_SIZE) + STATE.P_X] - s[(this._p[0] * STATE_SIZE) + STATE.P_X] - this._lr;
-        var Ly = s[(this._p[1] * STATE_SIZE) + STATE.P_Y] - s[(this._p[0] * STATE_SIZE) + STATE.P_Y] - this._lr;
-        var Lz = s[(this._p[1] * STATE_SIZE) + STATE.P_Z] - s[(this._p[0] * STATE_SIZE) + STATE.P_Z] - this._lr;
-        s[(this._p[0] * STATE_SIZE) + STATE.F_X] += this._k * Lx;
-        s[(this._p[0] * STATE_SIZE) + STATE.F_Y] += this._k * Ly;
-        s[(this._p[0] * STATE_SIZE) + STATE.F_Z] += this._k * Lz;
-        s[(this._p[1] * STATE_SIZE) + STATE.F_X] += -1 * this._k * Lx;
-        s[(this._p[1] * STATE_SIZE) + STATE.F_Y] += -1 * this._k * Ly;
-        s[(this._p[1] * STATE_SIZE) + STATE.F_Z] += -1 * this._k * Lz;
+        // Find the distance between pairs of points
+        var Lx = s[(this._p[1] * STATE_SIZE) + STATE.P_X] - s[(this._p[0] * STATE_SIZE) + STATE.P_X];
+        var Ly = s[(this._p[1] * STATE_SIZE) + STATE.P_Y] - s[(this._p[0] * STATE_SIZE) + STATE.P_Y];
+        var Lz = s[(this._p[1] * STATE_SIZE) + STATE.P_Z] - s[(this._p[0] * STATE_SIZE) + STATE.P_Z];
+        var distance = Math.sqrt(Math.pow(Lx, 2) + Math.pow(Ly, 2) + Math.pow(Lz, 2));
+        // Find L, the spring displacement length
+        var L = distance - this._lr;
+        // Normalize the vector [Lx, Ly, Lz], multiply L by the spring constant
+        var Fx = this._k * Lx / distance * L;
+        var Fy = this._k * Ly / distance * L;
+        var Fz = this._k * Lz / distance * L;
+        // Apply force to P0, and inverse force to P1
+        s[(this._p[0] * STATE_SIZE) + STATE.F_X] += Fx;
+        s[(this._p[0] * STATE_SIZE) + STATE.F_Y] += Fy;
+        s[(this._p[0] * STATE_SIZE) + STATE.F_Z] += Fz;
+        s[(this._p[1] * STATE_SIZE) + STATE.F_X] += -Fx;
+        s[(this._p[1] * STATE_SIZE) + STATE.F_Y] += -Fy;
+        s[(this._p[1] * STATE_SIZE) + STATE.F_Z] += -Fz;
         break;
       default:
         console.log("Unimplemented force type: " + this._type);

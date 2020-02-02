@@ -348,7 +348,7 @@ function initParticleSystems() {
     vbo_1, vbo_3,
     [
       // gravity
-      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, [0, 1]).init_vectored(-tracker.gravity),
+      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, [0, 1, 2, 3]).init_vectored(-tracker.gravity),
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // spring

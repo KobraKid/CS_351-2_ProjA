@@ -133,13 +133,25 @@ function updateKeypresses() {
       case "32":
         for (var i = 0; i < BBALL_PARTICLE_COUNT; i++) {
           bball.addForce(new Force(
-            FORCE_TYPE.FORCE_WIND,
-            [i],
-            INIT_VEL * Math.random() * 60,
-            TIMEOUT_INSTANT,
-            Math.random() * 2 - 1,
-            Math.random() * 2 - 1,
-            Math.random() * 2));
+              FORCE_TYPE.FORCE_WIND,
+              [i],
+              TIMEOUT_INSTANT)
+            .init_vectored(
+              INIT_VEL * Math.random() * 25,
+              Math.random() * 2 - 1,
+              Math.random() * 2 - 1,
+              Math.random() * 2));
+        }
+        for (var i = 0; i < SPRING_PARTICLE_COUNT; i++) {
+          spring.addForce(new Force(
+              FORCE_TYPE.FORCE_WIND,
+              [i],
+              TIMEOUT_INSTANT)
+            .init_vectored(
+              INIT_VEL * Math.random() * 25,
+              Math.random() * 2 - 1,
+              Math.random() * 2 - 1,
+              Math.random() * 2 - 1));
         }
         break;
       default:
