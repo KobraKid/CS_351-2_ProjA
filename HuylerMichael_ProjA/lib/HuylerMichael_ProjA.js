@@ -32,7 +32,7 @@ var vbo_boxes = [];
 var INIT_VEL = 0.15 * 60.0;
 var BBALL_PARTICLE_COUNT = 5;
 var bball = new PartSys(BBALL_PARTICLE_COUNT);
-var SPRING_PARTICLE_COUNT = 4;
+var SPRING_PARTICLE_COUNT = 9;
 var spring = new PartSys(SPRING_PARTICLE_COUNT);
 
 /**
@@ -334,13 +334,18 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
+      // wind
+      ...[...particles.map(i => new Force(FORCE_TYPE.FORCE_WIND, [i]).init_vectored(INIT_VEL * Math.random() * 25,
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1))]
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -1, 1, 0, 0.975),
     ]
   );
+  particles.forEach(i => bball.disableForce(i + 2));
   bball.constraint_set[0].draw(bball._c_vbo, 0, true);
-
   // Particle System 2
   particles = [...Array(SPRING_PARTICLE_COUNT).keys()];
   var k_s = 10; // spring constant
@@ -348,21 +353,59 @@ function initParticleSystems() {
     vbo_1, vbo_3,
     [
       // gravity
-      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, [0, 1, 2, 3]).init_vectored(-tracker.gravity),
+      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
-      // spring
+      // spring: tetrahedron
       new Force(FORCE_TYPE.FORCE_SPRING, [0, 1]).init_spring(k_s, 0.15),
       new Force(FORCE_TYPE.FORCE_SPRING, [0, 2]).init_spring(k_s, 0.15),
       new Force(FORCE_TYPE.FORCE_SPRING, [1, 2]).init_spring(k_s, 0.15),
       new Force(FORCE_TYPE.FORCE_SPRING, [0, 3]).init_spring(k_s, 0.15),
       new Force(FORCE_TYPE.FORCE_SPRING, [1, 3]).init_spring(k_s, 0.15),
       new Force(FORCE_TYPE.FORCE_SPRING, [2, 3]).init_spring(k_s, 0.15),
+      // spring: snake
+      new Force(FORCE_TYPE.FORCE_SPRING, [4, 5]).init_spring(k_s, 0.05),
+      new Force(FORCE_TYPE.FORCE_SPRING, [5, 6]).init_spring(k_s, 0.10),
+      new Force(FORCE_TYPE.FORCE_SPRING, [6, 7]).init_spring(k_s, 0.15),
+      new Force(FORCE_TYPE.FORCE_SPRING, [7, 8]).init_spring(k_s, 0.20),
+
+      new Force(FORCE_TYPE.FORCE_WIND, [4]).init_vectored(4, 0, 1, 0),
+      new Force(FORCE_TYPE.FORCE_WIND, [4]).init_vectored(4, 1, 0, 0),
+      new Force(FORCE_TYPE.FORCE_WIND, [4]).init_vectored(4, 0, -1, 0),
+      new Force(FORCE_TYPE.FORCE_WIND, [4]).init_vectored(4, -1, 0, 0),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -1, 1, 1.025, 2),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -2, 2, -2, 2, 1.025, 2),
     ]
   );
+  spring.disableForce(11);
+  spring.disableForce(12);
+  spring.disableForce(13);
+  spring.disableForce(14);
+  var snake = setInterval(function() {
+    spring.enableForce(11);
+    spring.disableForce(12);
+    spring.disableForce(13);
+    spring.disableForce(14);
+    setTimeout(function() {
+      spring.disableForce(11);
+      spring.enableForce(12);
+      spring.disableForce(13);
+      spring.disableForce(14);
+      setTimeout(function() {
+        spring.disableForce(11);
+        spring.disableForce(12);
+        spring.enableForce(13);
+        spring.disableForce(14);
+        setTimeout(function() {
+          spring.disableForce(11);
+          spring.disableForce(12);
+          spring.disableForce(13);
+          spring.enableForce(14);
+        }, 3000)
+      }, 3000)
+    }, 3000)
+  }, 12000);
   spring.constraint_set[0].draw(spring._c_vbo, 0, true);
 }
 

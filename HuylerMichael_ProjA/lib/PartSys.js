@@ -164,7 +164,6 @@ class PartSys {
       s[i + STATE.F_Z] = 0;
     }
     this.force_set.forEach((force, _) => force.apply(s));
-    this.force_set = this.force_set.filter(force => !force.expired());
   }
 
   /**
@@ -281,6 +280,24 @@ class PartSys {
    */
   addForce(f) {
     this.force_set = f;
+  }
+
+  /**
+   * Enables a force.
+   *
+   * @param {number} i The index of the force to be enabled.
+   */
+  enableForce(i) {
+    this.force_set[i].enable();
+  }
+
+  /**
+   * Disables a force.
+   *
+   * @param {number} i The index of the force to be disabled.
+   */
+  disableForce(i) {
+    this.force_set[i].disable();
   }
 
   /**
@@ -446,10 +463,10 @@ class Force {
    * @param {Array<number>} affected_particles The list of affected particles.
    * @param {number} timeout How long the force should last.
    */
-  constructor(type, affected_particles, timeout = TIMEOUT_NO_TIMEOUT) {
+  constructor(type, affected_particles) {
     this._type = type;
     this._p = affected_particles;
-    this._t = timeout;
+    this._enabled = true;
   }
 
   get x() {
@@ -503,11 +520,27 @@ class Force {
   }
 
   /**
+   * Enables this force.
+   */
+  enable() {
+    this._enabled = true;
+  }
+
+  /**
+   * Disables this force.
+   */
+  disable() {
+    this._enabled = false;
+  }
+
+  /**
    * Applies this force to a given state vector.
    *
    * @param {!Float32Array} s The state vector to apply this force to.
    */
   apply(s) {
+    if (!this._enabled)
+      return;
     switch (this._type) {
       case FORCE_TYPE.FORCE_SIMP_GRAVITY:
         for (var i = 0; i < this._p.length; i++) {
@@ -552,25 +585,6 @@ class Force {
         console.log("Unimplemented force type: " + this._type);
         return;
     }
-    if (this.expires()) this._t -= 1;
-  }
-
-  /**
-   * Checks if this force can time out.
-   *
-   * @return {boolean} Whether this force can time out.
-   */
-  expires() {
-    return (this._t >= 0);
-  }
-
-  /**
-   * Checks if this force has expired.
-   *
-   * @return {boolean} Whether this force has expired.
-   */
-  expired() {
-    return this.expires() && this._t == 0;
   }
 
 }
@@ -637,6 +651,7 @@ class Constraint {
         // no bounds
         break;
       default:
+        console.log("invalid constraint type: " + type);
         break;
     }
     this._p = affected_particles;
