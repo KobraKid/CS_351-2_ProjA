@@ -32,7 +32,8 @@ var vbo_boxes = [];
 var INIT_VEL = 0.15 * 60.0;
 var BBALL_PARTICLE_COUNT = 5;
 var bball = new PartSys(BBALL_PARTICLE_COUNT);
-var SPRING_PARTICLE_COUNT = 9;
+var CLOTH_SIZE = 6;
+var SPRING_PARTICLE_COUNT = 4 + (CLOTH_SIZE * CLOTH_SIZE);
 var spring = new PartSys(SPRING_PARTICLE_COUNT);
 
 /**
@@ -330,82 +331,96 @@ function initParticleSystems() {
   bball.init(PARTICLE_SYSTEM.BOUNCY_BALL,
     vbo_1, vbo_2,
     [
-      // gravity
-      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
-      // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // wind
       ...[...particles.map(i => new Force(FORCE_TYPE.FORCE_WIND, [i]).init_vectored(INIT_VEL * Math.random() * 25,
         Math.random() * 2 - 1,
         Math.random() * 2 - 1,
-        Math.random() * 2 - 1))]
+        Math.random() * 2 - 1))],
+      // gravity
+      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
+      // air drag
+      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -1, 1, 0, 0.975),
     ]
   );
-  particles.forEach(i => bball.disableForce(i + 2));
+  particles.forEach(i => bball.disableForce(i));
   bball.constraint_set[0].draw(bball._c_vbo, 0, true);
   // Particle System 2
   particles = [...Array(SPRING_PARTICLE_COUNT).keys()];
-  var k_s = 10; // spring constant
+  var k_s = 30; // spring constant
+  var k_d = 5; // damping coefficient
+  var dist = 0.05;
+  var damp = 1;
+  var cloth_f = [];
+  var cloth_c = [];
+  for (var i = 0; i < CLOTH_SIZE * CLOTH_SIZE; i++) {
+    // Pin the top of the cloth
+    if (i < CLOTH_SIZE) {
+      cloth_c.push(new Constraint(CONSTRAINT_TYPE.ABSOLUTE, [(i + 4)], undefined, 0, i * dist, 1.8));
+    }
+    /* Structural Springs */
+    // Horizontal
+    if (i % CLOTH_SIZE < CLOTH_SIZE - 1) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [(i + 4), (i + 4) + 1]).init_spring(k_s, dist, damp));
+    }
+    // Vertical
+    if (i < CLOTH_SIZE * (CLOTH_SIZE - 1)) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [(i + 4), (i + 4) + CLOTH_SIZE]).init_spring(k_s, dist, damp));
+    }
+    /* Shear Springs */
+    // Diagonal left
+    if (i < CLOTH_SIZE * (CLOTH_SIZE - 1) && i % CLOTH_SIZE < CLOTH_SIZE - 1) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [(i + 4), (i + 4) + CLOTH_SIZE + 1]).init_spring(k_s, Math.sqrt(dist * dist + dist * dist), damp));
+    }
+    // Diagonal right
+    if (i < CLOTH_SIZE * (CLOTH_SIZE - 1) && i % CLOTH_SIZE > 0) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [(i + 4), (i + 4) + CLOTH_SIZE - 1]).init_spring(k_s, Math.sqrt(dist * dist + dist * dist), damp));
+    }
+    /* Bend Springs */
+    // Horizontal
+    if (i % CLOTH_SIZE < CLOTH_SIZE - 2) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [(i + 4), (i + 4) + 2]).init_spring(k_s, dist * 2, damp));
+    }
+    // Vertical
+    if (i < CLOTH_SIZE * (CLOTH_SIZE - 2)) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [(i + 4), (i + 4) + (CLOTH_SIZE * 2)]).init_spring(k_s, dist * 2, damp));
+    }
+  }
+  k_s = 10; // spring constant
+  k_d = 5; // damping coefficient
+  dist = 0.15;
+  damp = 0;
   spring.init(PARTICLE_SYSTEM.BOUNCY_BALL,
     vbo_1, vbo_3,
     [
+      // wind
+      ...[...particles.map(i => new Force(FORCE_TYPE.FORCE_WIND, [i]).init_vectored(INIT_VEL * Math.random() * 4,
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1,
+        Math.random() * 2 - 1))],
       // gravity
-      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
+      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity / 8),
       // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
+      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag * 4),
       // spring: tetrahedron
-      new Force(FORCE_TYPE.FORCE_SPRING, [0, 1]).init_spring(k_s, 0.15),
-      new Force(FORCE_TYPE.FORCE_SPRING, [0, 2]).init_spring(k_s, 0.15),
-      new Force(FORCE_TYPE.FORCE_SPRING, [1, 2]).init_spring(k_s, 0.15),
-      new Force(FORCE_TYPE.FORCE_SPRING, [0, 3]).init_spring(k_s, 0.15),
-      new Force(FORCE_TYPE.FORCE_SPRING, [1, 3]).init_spring(k_s, 0.15),
-      new Force(FORCE_TYPE.FORCE_SPRING, [2, 3]).init_spring(k_s, 0.15),
-      // spring: snake
-      new Force(FORCE_TYPE.FORCE_SPRING, [4, 5]).init_spring(k_s, 0.05),
-      new Force(FORCE_TYPE.FORCE_SPRING, [5, 6]).init_spring(k_s, 0.10),
-      new Force(FORCE_TYPE.FORCE_SPRING, [6, 7]).init_spring(k_s, 0.15),
-      new Force(FORCE_TYPE.FORCE_SPRING, [7, 8]).init_spring(k_s, 0.20),
-
-      new Force(FORCE_TYPE.FORCE_WIND, [4]).init_vectored(4, 0, 1, 0),
-      new Force(FORCE_TYPE.FORCE_WIND, [4]).init_vectored(4, 1, 0, 0),
-      new Force(FORCE_TYPE.FORCE_WIND, [4]).init_vectored(4, 0, -1, 0),
-      new Force(FORCE_TYPE.FORCE_WIND, [4]).init_vectored(4, -1, 0, 0),
+      new Force(FORCE_TYPE.FORCE_SPRING, [0, 1]).init_spring(k_s, dist, damp),
+      new Force(FORCE_TYPE.FORCE_SPRING, [0, 2]).init_spring(k_s, dist, damp),
+      new Force(FORCE_TYPE.FORCE_SPRING, [1, 2]).init_spring(k_s, dist, damp),
+      new Force(FORCE_TYPE.FORCE_SPRING, [0, 3]).init_spring(k_s, dist, damp),
+      new Force(FORCE_TYPE.FORCE_SPRING, [1, 3]).init_spring(k_s, dist, damp),
+      new Force(FORCE_TYPE.FORCE_SPRING, [2, 3]).init_spring(k_s, dist, damp),
+      // spring: cloth
+      ...cloth_f,
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -2, 2, -2, 2, 1.025, 2),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL ^ WALL.BOTTOM, -2, 2, -2, 2, 1.025, 2),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, [0, 1, 2, 3], WALL.BOTTOM, -2, 2, -2, 2, 1.025, 2),
+      ...cloth_c,
     ]
   );
-  spring.disableForce(11);
-  spring.disableForce(12);
-  spring.disableForce(13);
-  spring.disableForce(14);
-  var snake = setInterval(function() {
-    spring.enableForce(11);
-    spring.disableForce(12);
-    spring.disableForce(13);
-    spring.disableForce(14);
-    setTimeout(function() {
-      spring.disableForce(11);
-      spring.enableForce(12);
-      spring.disableForce(13);
-      spring.disableForce(14);
-      setTimeout(function() {
-        spring.disableForce(11);
-        spring.disableForce(12);
-        spring.enableForce(13);
-        spring.disableForce(14);
-        setTimeout(function() {
-          spring.disableForce(11);
-          spring.disableForce(12);
-          spring.disableForce(13);
-          spring.enableForce(14);
-        }, 3000)
-      }, 3000)
-    }, 3000)
-  }, 12000);
+  particles.forEach(i => spring.disableForce(i));
   spring.constraint_set[0].draw(spring._c_vbo, 0, true);
 }
 

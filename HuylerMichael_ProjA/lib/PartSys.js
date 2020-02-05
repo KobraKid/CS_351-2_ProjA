@@ -509,12 +509,20 @@ class Force {
     return this;
   }
 
-  init_spring(k, length) {
+  /**
+   * @param {number} k The spring constant.
+   * @param {number} length The natural length of this spring.
+   * @param {number} damp The damping of this spring.
+   */
+  init_spring(k, length, damp) {
     this._k = k;
     this._lr = length;
+    this._d = damp;
     return this;
   }
 
+  /**
+   */
   init_boid() {
     return this;
   }
@@ -573,6 +581,10 @@ class Force {
         var Fx = this._k * Lx / distance * L;
         var Fy = this._k * Ly / distance * L;
         var Fz = this._k * Lz / distance * L;
+        // Dampen the forces
+        Fx += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_X] - s[(this._p[1] * STATE_SIZE) + STATE.V_X] * Math.pow(Lx / distance, 2);
+        Fy += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Y] - s[(this._p[1] * STATE_SIZE) + STATE.V_Y] * Math.pow(Ly / distance, 2);
+        Fz += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Z] - s[(this._p[1] * STATE_SIZE) + STATE.V_Z] * Math.pow(Lz / distance, 2);
         // Apply force to P0, and inverse force to P1
         s[(this._p[0] * STATE_SIZE) + STATE.F_X] += Fx;
         s[(this._p[0] * STATE_SIZE) + STATE.F_Y] += Fy;
@@ -599,6 +611,7 @@ const CONSTRAINT_TYPE = {
   VOLUME_VELOCITY_REVERSE: 1,
   SPHERE: 2,
   STIFF_SPRING: 3,
+  ABSOLUTE: 4,
 };
 
 /**
@@ -649,6 +662,11 @@ class Constraint {
         if (affected_particles.length != 2)
           console.error("invalid spring - wrong number of particles: " + affected_particles.length);
         // no bounds
+        break;
+      case CONSTRAINT_TYPE.ABSOLUTE:
+        this._x = bounds[0];
+        this._y = bounds[1];
+        this._z = bounds[2];
         break;
       default:
         console.log("invalid constraint type: " + type);
@@ -812,6 +830,16 @@ class Constraint {
             Math.pow(s2[this._p[0] + STATE.P_Z] + s2[this._p[0] + STATE.V_Z] - s2[this._p[1] + STATE.P_Z] + s2[this._p[1] + STATE.V_Z], 2)
           ) > 0.5) {
           console.log('breaking');
+        }
+        break;
+      case CONSTRAINT_TYPE.ABSOLUTE:
+        for (var i = 0; i < this._p.length; i++) {
+          s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x;
+          s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y;
+          s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z;
+          s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = 0;
+          s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = 0;
+          s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = 0;
         }
         break;
       default:

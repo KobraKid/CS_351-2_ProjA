@@ -34,8 +34,20 @@ function keyUp(kev) {
 
 function updateKeypresses() {
   for (var key in keysPressed) {
-    if (!keysPressed[key])
+    if (!keysPressed[key]) {
+      switch (key) {
+        case "KeyC":
+        case "67":
+          tracker.clear = true;
+          break;
+        case "Space":
+        case "32":
+          [...Array(BBALL_PARTICLE_COUNT).keys()].forEach(i => bball.disableForce(i));
+          [...Array(SPRING_PARTICLE_COUNT).keys()].forEach(i => spring.disableForce(i));
+          break;
+      }
       continue;
+    }
     switch (key) {
       case "KeyP":
       case "80":
@@ -43,7 +55,7 @@ function updateKeypresses() {
         break;
       case "KeyC":
       case "67":
-        tracker.clear = !tracker.clear;
+        tracker.clear = false;
         break;
       case "KeyW":
       case "87":
@@ -131,28 +143,8 @@ function updateKeypresses() {
         break;
       case "Space":
       case "32":
-        for (var i = 0; i < BBALL_PARTICLE_COUNT; i++) {
-          bball.addForce(new Force(
-              FORCE_TYPE.FORCE_WIND,
-              [i],
-              TIMEOUT_INSTANT)
-            .init_vectored(
-              INIT_VEL * Math.random() * 25,
-              Math.random() * 2 - 1,
-              Math.random() * 2 - 1,
-              Math.random() * 2));
-        }
-        for (var i = 0; i < SPRING_PARTICLE_COUNT; i++) {
-          spring.addForce(new Force(
-              FORCE_TYPE.FORCE_WIND,
-              [i],
-              TIMEOUT_INSTANT)
-            .init_vectored(
-              INIT_VEL * Math.random() * 25,
-              Math.random() * 2 - 1,
-              Math.random() * 2 - 1,
-              Math.random() * 2 - 1));
-        }
+        [...Array(BBALL_PARTICLE_COUNT).keys()].forEach(i => bball.enableForce(i));
+        [...Array(SPRING_PARTICLE_COUNT).keys()].forEach(i => spring.enableForce(i));
         break;
       default:
         // console.log("Unused key: " + key);
