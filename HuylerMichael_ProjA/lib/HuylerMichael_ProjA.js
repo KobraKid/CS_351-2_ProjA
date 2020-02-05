@@ -15,24 +15,28 @@ var canvas;
 var aspect;
 
 /* VBO Boxes */
-// Ground plane VBOBox
+// Ground plane
 var vbo_0;
-// Bouncy ball VBOBox
+// Bouncy balls & springs
 var vbo_1;
-// Ball container visualization
+// Volume constraints
 var vbo_2;
-// Spring visualization
+// Spring forces
 var vbo_3;
+// Boids
+var vbo_4;
 // Array containing all VBOBoxes
 var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var BBALL_PARTICLE_COUNT = 5;
+var BBALL_PARTICLE_COUNT = 50;
 var bball = new PartSys(BBALL_PARTICLE_COUNT);
 var CLOTH_SIZE = 10;
 var SPRING_PARTICLE_COUNT = CLOTH_SIZE * CLOTH_SIZE;
 var spring = new PartSys(SPRING_PARTICLE_COUNT);
+var BOID_PARTICLE_COUNT = 4;
+var boid = new PartSys(BOID_PARTICLE_COUNT);
 
 /**
  * Initialize global variables, event listeners, etc.
@@ -68,8 +72,11 @@ function main() {
   window.addEventListener("keyup", keyUp, false);
 
   initGui();
-  initVBOBoxes();
   initParticleSystems();
+  initVBOBoxes();
+  boid.constraint_set[0].draw(boid._c_vbo, true);
+  bball.constraint_set[0].draw(bball._c_vbo, true);
+  spring.constraint_set[0].draw(spring._c_vbo, true);
 
   var shouldUpdateKeypress = 0;
   var tick = function() {
@@ -215,14 +222,14 @@ function initVBOBoxes() {
         bball.s1dot = bball.dotFinder(bball.s1);
         bball.solver(Number(tracker.solver));
         bball.doConstraints();
-        bball.render(vbo_1);
+        bball.render();
         bball.swap(bball.s1, bball.s2);
 
         spring.applyAllForces(spring.s1);
         spring.s1dot = spring.dotFinder(spring.s1);
         spring.solver(Number(tracker.solver));
         spring.doConstraints();
-        spring.render(vbo_1, BBALL_PARTICLE_COUNT * STATE_SIZE);
+        spring.render(BBALL_PARTICLE_COUNT * STATE_SIZE);
         spring.swap(spring.s1, spring.s2);
       }
     });
@@ -336,16 +343,78 @@ function initVBOBoxes() {
     });
   vbo_3.init();
   vbo_boxes.push(vbo_3);
+
+  var vertex_shader_4 = `
+    precision mediump float;
+
+    uniform mat4 u_model_matrix_4;
+    uniform mat4 u_view_matrix_4;
+    uniform mat4 u_projection_matrix_4;
+
+    attribute vec4 a_position_4;
+    attribute vec4 a_color_4;
+
+    varying vec4 v_color_4;
+
+    void main() {
+      gl_PointSize = 16.0;
+      gl_Position = u_projection_matrix_4 * u_view_matrix_4 * u_model_matrix_4 * a_position_4;
+      v_color_4 = vec4(a_color_4);
+    }`;
+  var fragment_shader_4 = `
+    precision mediump float;
+
+    // VARYING
+    varying vec4 v_color_4;
+
+    void main() {
+      float dist = distance(gl_PointCoord, vec2(0.5, 0.5));
+      if (dist < 0.5) {
+        gl_FragColor = vec4((1.0 - 2.0 * dist) * v_color_4.rgb, 1.0);
+      } else { discard; }
+    }`;
+  vbo_4 = new VBOBox(
+    vertex_shader_4,
+    fragment_shader_4,
+    new Float32Array(BOID_PARTICLE_COUNT * STATE_SIZE),
+    gl.POINTS,
+    STATE_SIZE, {
+      'a_position_4': [0, 3],
+      'a_color_4': [9, 4],
+    },
+    4,
+    () => {
+      if (!tracker.pause) {
+        boid.applyAllForces(boid.s1);
+        boid.s1dot = boid.dotFinder(boid.s1);
+        boid.solver(Number(tracker.solver));
+        boid.doConstraints();
+        boid.render();
+        boid.swap(boid.s1, boid.s2);
+      }
+    });
+  vbo_4.init();
+  vbo_boxes.push(vbo_4);
 }
 
 /**
  * Initializes all of the particle systems.
  */
 function initParticleSystems() {
-  /* Particle System 1 */
+  /* Particle System 2 */
+  particles = [...Array(BOID_PARTICLE_COUNT).keys()];
+  boid.init(PARTICLE_SYSTEM.BOIDS,
+    4, 2,
+    [],
+    [
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, 0.025, 2, 0, 0.975),
+    ]
+  );
+
+  /* Particle System 3 */
   particles = [...Array(BBALL_PARTICLE_COUNT).keys()];
   bball.init(PARTICLE_SYSTEM.BOUNCY_BALL,
-    vbo_1, vbo_2,
+    1, 2,
     [
       // wind
       ...[...particles.map(i => new Force(FORCE_TYPE.FORCE_WIND, [i]).init_vectored(INIT_VEL * Math.random() * 25,
@@ -358,14 +427,13 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -1, 1, 0, 0.975),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -2, -0.025, 0, 0.975),
     ]
   );
   // Disable wind forces
   particles.forEach(i => bball.disableForce(i));
-  bball.constraint_set[0].draw(bball._c_vbo, 0, true);
 
-  /* Particle System 2 */
+  /* Particle System 4 */
   particles = [...Array(SPRING_PARTICLE_COUNT).keys()];
   var k_s = 30; // spring constant
   var k_d = 5; // damping coefficient
@@ -408,8 +476,8 @@ function initParticleSystems() {
   k_s = 10; // spring constant
   k_d = 0; // damping coefficient
   dist = 0.15;
-  spring.init(PARTICLE_SYSTEM.BOUNCY_BALL,
-    vbo_1, vbo_3,
+  spring.init(PARTICLE_SYSTEM.CLOTH,
+    1, 2,
     [
       // wind
       ...[...particles.map(i => new Force(FORCE_TYPE.FORCE_WIND, [i]).init_vectored(INIT_VEL * Math.random() * 4,
@@ -424,13 +492,12 @@ function initParticleSystems() {
       ...cloth_f,
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL ^ WALL.BOTTOM, -2, 2, -2, 2, 1.025, 2),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL ^ WALL.BOTTOM, -1, 1, -2, 2, 1.025, 2),
       ...cloth_c,
     ]
   );
   // Disable wind forces
   particles.forEach(i => spring.disableForce(i));
-  spring.constraint_set[0].draw(spring._c_vbo, 0, true);
 }
 
 /**

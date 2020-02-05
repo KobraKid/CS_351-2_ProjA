@@ -11,8 +11,10 @@
  */
 const PARTICLE_SYSTEM = {
   BOUNCY_BALL: 0,
+  CLOTH: 1,
+  BOIDS: 2,
 };
-const PARTICLE_SYSTEM_STRINGS = ["Bouncy Ball"];
+const PARTICLE_SYSTEM_STRINGS = ["Bouncy Ball", "Cloth Simulation", "Boids"];
 
 /**
  * States stored in a state array.
@@ -63,7 +65,7 @@ class PartSys {
     this._type = -1;
     this._BBALL_PARTICLE_COUNT = BBALL_PARTICLE_COUNT;
     this._vbo = null;
-    this._c_vbo = null;
+    this._c_vbo = -1;
     this._s1 = new Float32Array(BBALL_PARTICLE_COUNT * STATE_SIZE);
     for (var i = 0; i < BBALL_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
       this._s1[i + STATE.P_X] = Math.random() * 2 - 1;
@@ -149,6 +151,7 @@ class PartSys {
     this.constraint_set = constraint_set;
     this._vbo = my_vbo;
     this._c_vbo = constraint_vbo;
+    this._boid_radius = 0.5;
     this.insertGui();
   }
 
@@ -253,13 +256,12 @@ class PartSys {
   /**
    * Updates values for transferring to the GPU.
    *
-   * @param {!VBOBox} box The VBOBox whose VBO should be updated.
    * @param {number=} index The index to start substituting data at.
    */
-  render(box, index = 0) {
+  render(index = 0) {
     // Send to the VBO box to call WebGLRenderingContext.bufferSubData()
-    box.vbo = this.s2;
-    box.reload(box.vbo, index);
+    vbo_boxes[this._vbo].vbo = this.s2;
+    vbo_boxes[this._vbo].reload(vbo_boxes[this._vbo].vbo, index);
   }
 
   /**
@@ -351,15 +353,25 @@ class PartSys {
     const hash = hex_sha1(this.toString());
     var partSysFolder = gui.addFolder(PARTICLE_SYSTEM_STRINGS[this.type] + ' Particle System [' + hash.substring(0, 8) + ']');
 
+    if (this._type == PARTICLE_SYSTEM.BOIDS) {
+      tracker[hash + "_radius"] = this._boid_radius;
+      partSysFolder.add(tracker, hash + "_radius").name("Boid Radius").onChange(function(value) {
+        this._boid_radius = Math.max(value, 0);
+      }.bind(this));
+    }
+
     // Add a master toggle to hide all of this particle system's constraints
     tracker[hash + "_drawn"] = true;
     partSysFolder.add(tracker, hash + "_drawn").name("Show constraints").onChange(function(value) {
-      this.constraint_set.forEach((constraint, i) => constraint.draw(this._c_vbo, i, value && tracker["c_" + hash + "_" + hex_sha1(this.constraint_set[i].toString()) + "_drawn"]));
+      this.constraint_set.forEach((constraint, i) => {
+        if (VISIBLE_CONSTRAINTS.includes(constraint.type))
+          constraint.draw(this._c_vbo, value && tracker["c_" + hash + "_" + hex_sha1(this.constraint_set[i].toString()) + "_drawn"]);
+      });
     }.bind(this));
 
     // Add controls for each constraint individually
     for (var index in this.constraint_set) {
-      if ([CONSTRAINT_TYPE.VOLUME_IMPULSIVE, CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE].includes(this.constraint_set[index].type)) {
+      if (VISIBLE_CONSTRAINTS.includes(this.constraint_set[index].type)) {
         const i = index;
         // Create unique attributes in the tracker object
         var constraintSubFolder = partSysFolder.addFolder('Constraint ' + i + ': ' + CONSTRAINT_STRINGS[i]);
@@ -369,7 +381,7 @@ class PartSys {
         // Toggle drawing this constraint
         tracker[attr + "_drawn"] = true;
         partSysFolder.add(tracker, attr + "_drawn").name("Visible").onChange(function(value) {
-          this.constraint_set[i].draw(this._c_vbo, i, value && tracker[hash + "_drawn"]);
+          this.constraint_set[i].draw(this._c_vbo, value && tracker[hash + "_drawn"]);
         }.bind(this));
 
         switch (this.constraint_set[i].type) {
@@ -382,7 +394,7 @@ class PartSys {
                 tracker[attr + "_x_min"] = tracker[attr + "_x_max"] - 0.1;
               }
               this.constraint_set[i].x_min = tracker[attr + "_x_min"];
-              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+              this.constraint_set[i].draw(this._c_vbo, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
             }.bind(this));
             tracker[attr + "_x_max"] = this.constraint_set[i].bounds[1];
             constraintSubFolder.add(tracker, attr + "_x_max").name("x-max").onChange(function() {
@@ -390,7 +402,7 @@ class PartSys {
                 tracker[attr + "_x_max"] = tracker[attr + "_x_min"] + 0.1;
               }
               this.constraint_set[i].x_max = tracker[attr + "_x_max"];
-              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+              this.constraint_set[i].draw(this._c_vbo, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
             }.bind(this));
             tracker[attr + "_y_min"] = this.constraint_set[i].bounds[2];
             constraintSubFolder.add(tracker, attr + "_y_min").name("y-min").onChange(function() {
@@ -398,7 +410,7 @@ class PartSys {
                 tracker[attr + "_y_min"] = tracker[attr + "_y_max"] - 0.1;
               }
               this.constraint_set[i].y_min = tracker[attr + "_y_min"];
-              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+              this.constraint_set[i].draw(this._c_vbo, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
             }.bind(this));
             tracker[attr + "_y_max"] = this.constraint_set[i].bounds[3];
             constraintSubFolder.add(tracker, attr + "_y_max").name("y-max").onChange(function() {
@@ -406,7 +418,7 @@ class PartSys {
                 tracker[attr + "_y_max"] = tracker[attr + "_y_min"] + 0.1;
               }
               this.constraint_set[i].y_max = tracker[attr + "_y_max"];
-              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+              this.constraint_set[i].draw(this._c_vbo, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
             }.bind(this));
             tracker[attr + "_z_min"] = this.constraint_set[i].bounds[4];
             constraintSubFolder.add(tracker, attr + "_z_min").name("z-min").onChange(function() {
@@ -414,7 +426,7 @@ class PartSys {
                 tracker[attr + "_z_min"] = tracker[attr + "_z_max"] - 0.1;
               }
               this.constraint_set[i].z_min = tracker[attr + "_z_min"];
-              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+              this.constraint_set[i].draw(this._c_vbo, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
             }.bind(this));
             tracker[attr + "_z_max"] = this.constraint_set[i].bounds[5];
             constraintSubFolder.add(tracker, attr + "_z_max").name("z-max").onChange(function() {
@@ -422,7 +434,7 @@ class PartSys {
                 tracker[attr + "_z_max"] = tracker[attr + "_z_min"] + 0.1;
               }
               this.constraint_set[i].z_max = tracker[attr + "_z_max"];
-              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+              this.constraint_set[i].draw(this._c_vbo, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
             }.bind(this));
             tracker[attr + "_enabled"] = true;
             constraintSubFolder.add(tracker, attr + "_enabled").name("Enabled").onChange(function(value) {
@@ -686,6 +698,10 @@ const WALL = {
   RIGHT: 0b100000,
 };
 
+const VISIBLE_CONSTRAINTS = [CONSTRAINT_TYPE.VOLUME_IMPULSIVE, CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE];
+// Used to keep track of what index this constraint is in the VBO
+var __constraint_volume_index = 0;
+
 /**
  * Creates rules for a constraint, and a function to be called to fix the
  * state vector if a constraint is not met.
@@ -708,6 +724,8 @@ class Constraint {
         this._y_max = bounds[3];
         this._z_min = bounds[4];
         this._z_max = bounds[5];
+        this._index = __constraint_volume_index;
+        __constraint_volume_index++;
         break;
       case CONSTRAINT_TYPE.SPHERE:
         this._x = bounds[0];
@@ -907,15 +925,14 @@ class Constraint {
    * Toggles drawing of this constraint, and updates vertices when bounds change.
    *
    * @param {!VBOBox} vbo The VBO to update.
-   * @param {number} index The index of this constraint.
    * @param {boolean} enabled Whether this constraint should be drawn.
    */
-  draw(vbo, index, enabled) {
+  draw(vbo, enabled) {
     var r = Math.random();
     var g = Math.random();
     var b = Math.random();
     enabled = enabled && this._enabled;
-    vbo.reload(
+    vbo_boxes[vbo].reload(
       new Float32Array([
         this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
         this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
@@ -953,7 +970,7 @@ class Constraint {
         this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
         this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
       ]),
-      index * 7 * 24);
+      this._index * 7 * 24);
   }
 
   /**
