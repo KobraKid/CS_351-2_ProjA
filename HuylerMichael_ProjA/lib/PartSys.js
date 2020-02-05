@@ -206,16 +206,16 @@ class PartSys {
       case SOLVER.EULER:
       case 0:
         for (var i = 0; i < this.s2.length; i++) {
-          this.s2[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.001);
+          this.s2[i] = this.s1[i] + this.s1dot[i] * (tracker.ms * 0.001);
         }
         break;
       case SOLVER.MIDPOINT:
         for (var i = 0; i < this.s2.length; i++) {
-          this.sM[i] = this.s1[i] + this.s1dot[i] * (timeStep * 0.0005);
+          this.sM[i] = this.s1[i] + this.s1dot[i] * (tracker.ms * 0.0005);
         }
         this.sMdot = this.dotFinder(this.sM);
         for (var i = 0; i < this.s2.length; i++) {
-          this.s2[i] = this.s1[i] + this.sMdot[i] * (timeStep * 0.001);
+          this.s2[i] = this.s1[i] + this.sMdot[i] * (tracker.ms * 0.001);
         }
         break;
       case SOLVER.ITER_BACK:
@@ -359,77 +359,79 @@ class PartSys {
 
     // Add controls for each constraint individually
     for (var index in this.constraint_set) {
-      // Create unique attributes in the tracker object
-      var constraintSubFolder = partSysFolder.addFolder('Constraint ' + index);
-      const c_hash = hex_sha1(this.constraint_set[index].toString());
-      const attr = "c_" + hash + "_" + c_hash;
-      const i = index;
+      if ([CONSTRAINT_TYPE.VOLUME_IMPULSIVE, CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE].includes(this.constraint_set[index].type)) {
+        const i = index;
+        // Create unique attributes in the tracker object
+        var constraintSubFolder = partSysFolder.addFolder('Constraint ' + i + ': ' + CONSTRAINT_STRINGS[i]);
+        const c_hash = hex_sha1(this.constraint_set[i].toString());
+        const attr = "c_" + hash + "_" + c_hash;
 
-      // Toggle drawing this constraint
-      tracker[attr + "_drawn"] = true;
-      partSysFolder.add(tracker, attr + "_drawn").name("Visible").onChange(function(value) {
-        this.constraint_set[i].draw(this._c_vbo, i, value && tracker[hash + "_drawn"]);
-      }.bind(this));
+        // Toggle drawing this constraint
+        tracker[attr + "_drawn"] = true;
+        partSysFolder.add(tracker, attr + "_drawn").name("Visible").onChange(function(value) {
+          this.constraint_set[i].draw(this._c_vbo, i, value && tracker[hash + "_drawn"]);
+        }.bind(this));
 
-      switch (this.constraint_set[i].type) {
-        case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
-        case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
-          // Adjust this constraint's bounds
-          tracker[attr + "_x_min"] = this.constraint_set[i].bounds[0];
-          constraintSubFolder.add(tracker, attr + "_x_min").name("x-min").onChange(function() {
-            if (tracker[attr + "_x_min"] >= tracker[attr + "_x_max"]) {
-              tracker[attr + "_x_min"] = tracker[attr + "_x_max"] - 0.1;
-            }
-            this.constraint_set[i].x_min = tracker[attr + "_x_min"];
-            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-          }.bind(this));
-          tracker[attr + "_x_max"] = this.constraint_set[i].bounds[1];
-          constraintSubFolder.add(tracker, attr + "_x_max").name("x-max").onChange(function() {
-            if (tracker[attr + "_x_max"] <= tracker[attr + "_x_min"]) {
-              tracker[attr + "_x_max"] = tracker[attr + "_x_min"] + 0.1;
-            }
-            this.constraint_set[i].x_max = tracker[attr + "_x_max"];
-            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-          }.bind(this));
-          tracker[attr + "_y_min"] = this.constraint_set[i].bounds[2];
-          constraintSubFolder.add(tracker, attr + "_y_min").name("y-min").onChange(function() {
-            if (tracker[attr + "_y_min"] >= tracker[attr + "_y_max"]) {
-              tracker[attr + "_y_min"] = tracker[attr + "_y_max"] - 0.1;
-            }
-            this.constraint_set[i].y_min = tracker[attr + "_y_min"];
-            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-          }.bind(this));
-          tracker[attr + "_y_max"] = this.constraint_set[i].bounds[3];
-          constraintSubFolder.add(tracker, attr + "_y_max").name("y-max").onChange(function() {
-            if (tracker[attr + "_y_max"] <= tracker[attr + "_y_min"]) {
-              tracker[attr + "_y_max"] = tracker[attr + "_y_min"] + 0.1;
-            }
-            this.constraint_set[i].y_max = tracker[attr + "_y_max"];
-            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-          }.bind(this));
-          tracker[attr + "_z_min"] = this.constraint_set[i].bounds[4];
-          constraintSubFolder.add(tracker, attr + "_z_min").name("z-min").onChange(function() {
-            if (tracker[attr + "_z_min"] >= tracker[attr + "_z_max"]) {
-              tracker[attr + "_z_min"] = tracker[attr + "_z_max"] - 0.1;
-            }
-            this.constraint_set[i].z_min = tracker[attr + "_z_min"];
-            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-          }.bind(this));
-          tracker[attr + "_z_max"] = this.constraint_set[i].bounds[5];
-          constraintSubFolder.add(tracker, attr + "_z_max").name("z-max").onChange(function() {
-            if (tracker[attr + "_z_max"] <= tracker[attr + "_z_min"]) {
-              tracker[attr + "_z_max"] = tracker[attr + "_z_min"] + 0.1;
-            }
-            this.constraint_set[i].z_max = tracker[attr + "_z_max"];
-            this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
-          }.bind(this));
-          tracker[attr + "_enabled"] = true;
-          constraintSubFolder.add(tracker, attr + "_enabled").name("Enabled").onChange(function(value) {
-            value ? this.constraint_set[i].enable() : this.constraint_set[i].disable();
-          }.bind(this));
-          break;
-        default:
-          break;
+        switch (this.constraint_set[i].type) {
+          case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
+          case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
+            // Adjust this constraint's bounds
+            tracker[attr + "_x_min"] = this.constraint_set[i].bounds[0];
+            constraintSubFolder.add(tracker, attr + "_x_min").name("x-min").onChange(function() {
+              if (tracker[attr + "_x_min"] >= tracker[attr + "_x_max"]) {
+                tracker[attr + "_x_min"] = tracker[attr + "_x_max"] - 0.1;
+              }
+              this.constraint_set[i].x_min = tracker[attr + "_x_min"];
+              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+            }.bind(this));
+            tracker[attr + "_x_max"] = this.constraint_set[i].bounds[1];
+            constraintSubFolder.add(tracker, attr + "_x_max").name("x-max").onChange(function() {
+              if (tracker[attr + "_x_max"] <= tracker[attr + "_x_min"]) {
+                tracker[attr + "_x_max"] = tracker[attr + "_x_min"] + 0.1;
+              }
+              this.constraint_set[i].x_max = tracker[attr + "_x_max"];
+              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+            }.bind(this));
+            tracker[attr + "_y_min"] = this.constraint_set[i].bounds[2];
+            constraintSubFolder.add(tracker, attr + "_y_min").name("y-min").onChange(function() {
+              if (tracker[attr + "_y_min"] >= tracker[attr + "_y_max"]) {
+                tracker[attr + "_y_min"] = tracker[attr + "_y_max"] - 0.1;
+              }
+              this.constraint_set[i].y_min = tracker[attr + "_y_min"];
+              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+            }.bind(this));
+            tracker[attr + "_y_max"] = this.constraint_set[i].bounds[3];
+            constraintSubFolder.add(tracker, attr + "_y_max").name("y-max").onChange(function() {
+              if (tracker[attr + "_y_max"] <= tracker[attr + "_y_min"]) {
+                tracker[attr + "_y_max"] = tracker[attr + "_y_min"] + 0.1;
+              }
+              this.constraint_set[i].y_max = tracker[attr + "_y_max"];
+              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+            }.bind(this));
+            tracker[attr + "_z_min"] = this.constraint_set[i].bounds[4];
+            constraintSubFolder.add(tracker, attr + "_z_min").name("z-min").onChange(function() {
+              if (tracker[attr + "_z_min"] >= tracker[attr + "_z_max"]) {
+                tracker[attr + "_z_min"] = tracker[attr + "_z_max"] - 0.1;
+              }
+              this.constraint_set[i].z_min = tracker[attr + "_z_min"];
+              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+            }.bind(this));
+            tracker[attr + "_z_max"] = this.constraint_set[i].bounds[5];
+            constraintSubFolder.add(tracker, attr + "_z_max").name("z-max").onChange(function() {
+              if (tracker[attr + "_z_max"] <= tracker[attr + "_z_min"]) {
+                tracker[attr + "_z_max"] = tracker[attr + "_z_min"] + 0.1;
+              }
+              this.constraint_set[i].z_max = tracker[attr + "_z_max"];
+              this.constraint_set[i].draw(this._c_vbo, i, tracker[attr + "_drawn"] && tracker[hash + "_drawn"]);
+            }.bind(this));
+            tracker[attr + "_enabled"] = true;
+            constraintSubFolder.add(tracker, attr + "_enabled").name("Enabled").onChange(function(value) {
+              value ? this.constraint_set[i].enable() : this.constraint_set[i].disable();
+            }.bind(this));
+            break;
+          default:
+            break;
+        }
       }
     }
   }
@@ -480,6 +482,12 @@ class Force {
   }
   get magnitude() {
     return this._magnitude;
+  }
+  get type() {
+    return this._type;
+  }
+  get particles() {
+    return this._p;
   }
 
   set x(new_x) {
@@ -577,11 +585,13 @@ class Force {
         var distance = Math.sqrt(Math.pow(Lx, 2) + Math.pow(Ly, 2) + Math.pow(Lz, 2));
         // Find L, the spring displacement length
         var L = distance - this._lr;
+        // Apply Hook's Law
         // Normalize the vector [Lx, Ly, Lz], multiply L by the spring constant
-        var Fx = this._k * Lx / distance * L;
-        var Fy = this._k * Ly / distance * L;
-        var Fz = this._k * Lz / distance * L;
+        var Fx = this._k * L * Lx / distance;
+        var Fy = this._k * L * Ly / distance;
+        var Fz = this._k * L * Lz / distance;
         // Dampen the forces
+        // Multiply damping coeff. by difference in velocities of particles and by the square of the normalized L vector
         Fx += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_X] - s[(this._p[1] * STATE_SIZE) + STATE.V_X] * Math.pow(Lx / distance, 2);
         Fy += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Y] - s[(this._p[1] * STATE_SIZE) + STATE.V_Y] * Math.pow(Ly / distance, 2);
         Fz += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Z] - s[(this._p[1] * STATE_SIZE) + STATE.V_Z] * Math.pow(Lz / distance, 2);
@@ -599,6 +609,45 @@ class Force {
     }
   }
 
+  /**
+   * Toggles drawing of this constraint, and updates vertices when bounds change.
+   *
+   * @param {!VBOBox} vbo The VBO to update.
+   * @param {number} index The index of this constraint.
+   * @param {boolean} enabled Whether this constraint should be drawn.
+   */
+  draw(vbo, index, enabled, p0, p1) {
+    var r = Math.random();
+    var g = Math.random();
+    var b = Math.random();
+    enabled = enabled && this._enabled;
+    switch (this._type) {
+      case FORCE_TYPE.FORCE_SPRING:
+        var len = Math.sqrt(Math.pow(p1[0] - p0[0], 2) + Math.pow(p1[1] - p0[1], 2) + Math.pow(p1[2] - p0[2], 2));
+        if (len < this._lr) {
+          // Overstretched
+          r = g = 0;
+          b = 1;
+        } else if (len > this._lr) {
+          // Understretched
+          r = 1;
+          g = b = 0;
+        } else {
+          // Natural length
+          r = g = b = 1;
+        }
+        vbo.reload(
+          new Float32Array([
+            p0[0], p0[1], p0[2], r, g, b, enabled | 0,
+            p1[0], p1[1], p1[2], r, g, b, enabled | 0,
+          ]),
+          index * 7 * 2);
+        break;
+      default:
+        break;
+    }
+  }
+
 }
 
 /**
@@ -613,6 +662,13 @@ const CONSTRAINT_TYPE = {
   STIFF_SPRING: 3,
   ABSOLUTE: 4,
 };
+const CONSTRAINT_STRINGS = [
+  "Volume [Impulsive]",
+  "Volume [Velocity Reverse]",
+  "Sphere",
+  "Stiff Spring",
+  "Absolute Position",
+];
 
 /**
  * Shortcut values for enabling only particular walls in a volume constraint.

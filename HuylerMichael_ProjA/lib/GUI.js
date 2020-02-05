@@ -27,16 +27,18 @@ var GuiTracker = function() {
   this.clear = true;
   this.pause = false;
   /* FPS */
-  this.fps = 0;
-  var prev = Date.now();
+  this.fps = 60.0;
+  this.ms = 1000.0 / 60.0; // timestep
+  this.prev = Date.now();
   /**
    * Updatets the FPS in the GUI
    */
   this.fps_calc = function() {
     var now = Date.now();
-    var elapsed = now - prev;
-    prev = now;
-    tracker.fps = elapsed;
+    var elapsed = now - this.prev;
+    this.prev = now;
+    this.ms = elapsed;
+    tracker.fps = 1000.0 / elapsed;
   }
 }
 var tracker = new GuiTracker();
@@ -50,7 +52,7 @@ function initGui() {
     name: 'My GUI',
     hideable: false
   });
-  gui.add(tracker, 'fps').name('FPS').listen();
+  gui.add(tracker, 'fps', 0, 60, 1).name('FPS').listen();
   gui.add(tracker, 'fountain').name('Fountain');
   gui.add(tracker, 'drag', 0, 1, 0.005);
   gui.add(tracker, 'gravity', 0);
