@@ -154,12 +154,27 @@ class PartSys {
     this._vbo = my_vbo;
     this._c_vbo = constraint_vbo;
     this._boid_radius = 0.5;
-    if (initial_conditions != undefined) {
-      this._s1 = initial_conditions.slice();
-      this._s1dot = initial_conditions.slice();
-      this._s2 = initial_conditions.slice();
-      this._sM = initial_conditions.slice();
-      this._sMdot = initial_conditions.slice();
+    this.blink(initial_conditions);
+    this.insertGui();
+  }
+
+  /**
+   * Instantaneously applys a state to this particle system.
+   *
+   * Calling this function will instantaneously transition this particle system
+   * to the state passed in (in the *blink* of an eye). This clears the
+   * previous state variables too, to prevent any weird effects caused by the
+   * retention of a previous (and potentially wildly different) state.
+   *
+   * @param {Float32Array} state The state to "blink" to.
+   */
+  blink(state) {
+    if (state != undefined) {
+      this._s1 = state.slice();
+      this._s1dot = state.slice();
+      this._s2 = state.slice();
+      this._sM = state.slice();
+      this._sMdot = state.slice();
     }
   }
 
@@ -245,20 +260,6 @@ class PartSys {
     this.constraint_set.forEach((constraint, _) => {
       constraint.constrain(this.s1, this.s2);
     });
-    if (tracker.fountain) {
-      for (var i = 0; i < this.s2.length; i += STATE_SIZE) {
-        this.s2[i + STATE.AGE] -= 1;
-        if (this.s2[i + STATE.AGE] <= 0) {
-          this.s2[i + STATE.P_X] = 0.2 * Math.random() - 0.1;
-          this.s2[i + STATE.P_Y] = 0.2 * Math.random() - 0.1;
-          this.s2[i + STATE.P_Z] = 0.4 * Math.random();
-          this.s2[i + STATE.V_X] = 0.8 * Math.random() - 0.4;
-          this.s2[i + STATE.V_Y] = 0.8 * Math.random() - 0.4;
-          this.s2[i + STATE.V_Z] = 10.0 * Math.random();
-          this.s2[i + STATE.AGE] = 30 + 100 * Math.random();
-        }
-      }
-    }
   }
 
   /**
@@ -382,7 +383,7 @@ class PartSys {
       if (VISIBLE_CONSTRAINTS.includes(this.constraint_set[index].type)) {
         const i = index;
         // Create unique attributes in the tracker object
-        var constraintSubFolder = partSysFolder.addFolder('Constraint ' + i + ': ' + CONSTRAINT_STRINGS[i]);
+        var constraintSubFolder = partSysFolder.addFolder('Constraint ' + i + ': ' + CONSTRAINT_STRINGS[this.constraint_set[index].type]);
         const c_hash = hex_sha1(this.constraint_set[i].toString());
         const attr = "c_" + hash + "_" + c_hash;
 
@@ -612,9 +613,10 @@ class Force {
         var Fz = this._k * L * Lz / distance;
         // Dampen the forces
         // Multiply damping coeff. by difference in velocities of particles and by the square of the normalized L vector
-        Fx += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_X] - s[(this._p[1] * STATE_SIZE) + STATE.V_X] * Math.pow(Lx / distance, 2);
-        Fy += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Y] - s[(this._p[1] * STATE_SIZE) + STATE.V_Y] * Math.pow(Ly / distance, 2);
-        Fz += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Z] - s[(this._p[1] * STATE_SIZE) + STATE.V_Z] * Math.pow(Lz / distance, 2);
+        // TODO Figure out why this skews to the +y direction
+        // Fx += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_X] - s[(this._p[1] * STATE_SIZE) + STATE.V_X] * Math.pow(Lx / distance, 2);
+        // Fy += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Y] - s[(this._p[1] * STATE_SIZE) + STATE.V_Y] * Math.pow(Ly / distance, 2);
+        // Fz += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Z] - s[(this._p[1] * STATE_SIZE) + STATE.V_Z] * Math.pow(Lz / distance, 2);
         // Apply force to P0, and inverse force to P1
         s[(this._p[0] * STATE_SIZE) + STATE.F_X] += Fx;
         s[(this._p[0] * STATE_SIZE) + STATE.F_Y] += Fy;
@@ -640,21 +642,23 @@ class Force {
     var r = Math.random();
     var g = Math.random();
     var b = Math.random();
+    var epsilon = 0.01;
     enabled = enabled && this._enabled;
     switch (this._type) {
       case FORCE_TYPE.FORCE_SPRING:
         var len = Math.sqrt(Math.pow(p1[0] - p0[0], 2) + Math.pow(p1[1] - p0[1], 2) + Math.pow(p1[2] - p0[2], 2));
-        if (len < this._lr) {
-          // Overstretched
-          r = g = 0;
-          b = 1;
-        } else if (len > this._lr) {
-          // Understretched
-          r = 1;
-          g = b = 0;
-        } else {
-          // Natural length
+        if (Math.abs(len - this._lr) < epsilon) {
+          // Approximately natural length
           r = g = b = 1;
+        } else {
+          var delta = 1 - Math.abs(len - this._lr) / this._lr;
+          if (delta <= 0.33) {
+            g = b = delta;
+            r = 1;
+          } else {
+            r = g = delta;
+            b = 1;
+          }
         }
         vbo.reload(
           new Float32Array([
@@ -679,14 +683,12 @@ const CONSTRAINT_TYPE = {
   VOLUME_IMPULSIVE: 0,
   VOLUME_VELOCITY_REVERSE: 1,
   SPHERE: 2,
-  STIFF_SPRING: 3,
-  ABSOLUTE: 4,
+  ABSOLUTE: 3,
 };
 const CONSTRAINT_STRINGS = [
   "Volume [Impulsive]",
   "Volume [Velocity Reverse]",
   "Sphere",
-  "Stiff Spring",
   "Absolute Position",
 ];
 
@@ -706,7 +708,7 @@ const WALL = {
   RIGHT: 0b100000,
 };
 
-const VISIBLE_CONSTRAINTS = [CONSTRAINT_TYPE.VOLUME_IMPULSIVE, CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE];
+const VISIBLE_CONSTRAINTS = [CONSTRAINT_TYPE.VOLUME_IMPULSIVE, CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE, CONSTRAINT_TYPE.SPHERE];
 // Used to keep track of what index this constraint is in the VBO
 var __constraint_volume_index = 0;
 
@@ -736,15 +738,10 @@ class Constraint {
         __constraint_volume_index++;
         break;
       case CONSTRAINT_TYPE.SPHERE:
-        this._x = bounds[0];
-        this._y = bounds[1];
-        this._z = bounds[2];
+        this._c = glMatrix.vec3.fromValues(bounds[0], bounds[1], bounds[2]);
         this._r = bounds[3];
-        break;
-      case CONSTRAINT_TYPE.STIFF_SPRING:
-        if (affected_particles.length != 2)
-          console.error("invalid spring - wrong number of particles: " + affected_particles.length);
-        // no bounds
+        this._index = __constraint_volume_index;
+        __constraint_volume_index += 2;
         break;
       case CONSTRAINT_TYPE.ABSOLUTE:
         this._x = bounds[0];
@@ -905,17 +902,35 @@ class Constraint {
         }
         break;
       case CONSTRAINT_TYPE.SPHERE:
+        var part_pos = glMatrix.vec3.create();
+        var part_vel = glMatrix.vec3.create();
         for (var i = 0; i < this._p.length; i++) {
-
-        }
-        break;
-      case CONSTRAINT_TYPE.STIFF_SPRING:
-        if (Math.sqrt(
-            Math.pow(s2[this._p[0] + STATE.P_X] + s2[this._p[0] + STATE.V_X] - s2[this._p[1] + STATE.P_X] + s2[this._p[1] + STATE.V_X], 2) +
-            Math.pow(s2[this._p[0] + STATE.P_Y] + s2[this._p[0] + STATE.V_Y] - s2[this._p[1] + STATE.P_Y] + s2[this._p[1] + STATE.V_Y], 2) +
-            Math.pow(s2[this._p[0] + STATE.P_Z] + s2[this._p[0] + STATE.V_Z] - s2[this._p[1] + STATE.P_Z] + s2[this._p[1] + STATE.V_Z], 2)
-          ) > 0.5) {
-          console.log('breaking');
+          part_pos = glMatrix.vec3.fromValues(
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_X],
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Y],
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Z]);
+          // Particle is inside the sphere
+          if (glMatrix.vec3.dist(part_pos, this._c) < this._r) {
+            // Place particle on the sphere's surface
+            glMatrix.vec3.subtract(part_pos, part_pos, this._c);
+            glMatrix.vec3.normalize(part_pos, part_pos);
+            glMatrix.vec3.scale(part_pos, part_pos, this._r);
+            glMatrix.vec3.add(part_pos, part_pos, this._c);
+            // Make the particle's velocity normal to the sphere's surface
+            glMatrix.vec3.subtract(part_vel, part_pos, this._c);
+            glMatrix.vec3.normalize(part_vel, part_vel);
+            glMatrix.vec3.scale(part_vel, part_vel, glMatrix.vec3.len(glMatrix.vec3.fromValues(
+              s2[(this._p[i] * STATE_SIZE) + STATE.V_X],
+              s2[(this._p[i] * STATE_SIZE) + STATE.V_Y],
+              s2[(this._p[i] * STATE_SIZE) + STATE.V_Z]
+            )));
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = part_pos[0];
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = part_pos[1];
+            s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = part_pos[2];
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = part_vel[0];
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = part_vel[1];
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = part_vel[2];
+          }
         }
         break;
       case CONSTRAINT_TYPE.ABSOLUTE:
@@ -944,45 +959,119 @@ class Constraint {
     var g = Math.random();
     var b = Math.random();
     enabled = enabled && this._enabled;
-    vbo_boxes[vbo].reload(
-      new Float32Array([
-        this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
-        this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
+    switch (this._type) {
+      case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
+      case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
+        vbo_boxes[vbo].reload(
+          new Float32Array([
+            this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
+            this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
 
-        this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
-        this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
+            this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
+            this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
 
-        this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
-        this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
+            this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
+            this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
 
-        this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
-        this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
+            this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
+            this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
 
-        this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
-        this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
+            this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
+            this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
 
-        this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
-        this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
+            this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
+            this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
 
-        this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
-        this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
+            this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
+            this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
 
-        this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
-        this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
+            this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
+            this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
 
-        this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
-        this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
+            this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
+            this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
 
-        this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
-        this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
+            this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
+            this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
 
-        this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
-        this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
+            this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
+            this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
 
-        this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
-        this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
-      ]),
-      this._index * 7 * 24);
+            this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
+            this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
+          ]),
+          this._index * 7 * 24);
+        break;
+      case CONSTRAINT_TYPE.SPHERE:
+        var out = glMatrix.vec3.create();
+        var corner = Math.sqrt(2) / 2;
+        vbo_boxes[vbo].reload(
+          new Float32Array([
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, enabled | 0,
+
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, enabled | 0,
+          ]),
+          this._index * 7 * 24);
+        break;
+      default:
+        break;
+    }
   }
 
   /**

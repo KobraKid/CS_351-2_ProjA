@@ -30,7 +30,7 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var BBALL_PARTICLE_COUNT = 50;
+var BBALL_PARTICLE_COUNT = 500;
 var bball = new PartSys(BBALL_PARTICLE_COUNT);
 var CLOTH_WIDTH = 10;
 var CLOTH_HEIGHT = 10;
@@ -77,18 +77,20 @@ function main() {
   initVBOBoxes();
   boid.constraint_set[0].draw(boid._c_vbo, true);
   bball.constraint_set[0].draw(bball._c_vbo, true);
+  bball.constraint_set[1].draw(bball._c_vbo, true);
   spring.constraint_set[0].draw(spring._c_vbo, true);
 
-  var shouldUpdateKeypress = 0;
+  var shouldUpdateFrame = 1;
   var tick = function() {
-    if (shouldUpdateKeypress >= 3) {
-      updateKeypresses();
-      shouldUpdateKeypress = 0;
-    }
-    shouldUpdateKeypress++;
+    updateKeypresses();
     requestAnimationFrame(tick, canvas);
-    tracker.fps_calc();
-    drawAll();
+    if (shouldUpdateFrame >= tracker.speed) {
+      tracker.fps_calc();
+      drawAll();
+      shouldUpdateFrame = 1;
+    } else {
+      shouldUpdateFrame++;
+    }
   };
   tick();
 }
@@ -271,7 +273,7 @@ function initVBOBoxes() {
     vertex_shader_2,
     fragment_shader_2,
     // 7 attributes, 12 lines (24 points) per box constraint
-    new Float32Array(7 * (24 * 4)),
+    new Float32Array(7 * (24 * 6)),
     gl.LINES,
     7, {
       'a_position_2': [0, 3],
@@ -444,7 +446,7 @@ function initParticleSystems() {
       ...[...particles.map(i => new Force(FORCE_TYPE.FORCE_WIND, [i]).init_vectored(INIT_VEL * Math.random() * 25,
         Math.random() * 2 - 1,
         Math.random() * 2 - 1,
-        Math.random() * 2 - 1))],
+        Math.random()))],
       // gravity
       new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
       // air drag
@@ -452,6 +454,7 @@ function initParticleSystems() {
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -2, -0.025, 0, 0.975),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, undefined, 0, -1, -0.55, 0.75),
     ],
     new Float32Array(initial_conditions)
   );
@@ -464,13 +467,13 @@ function initParticleSystems() {
   k_d = 5;
   dist = 0.05;
   initial_conditions = [];
-  for (var i = 0; i < SPRING_PARTICLE_COUNT; i ++) {
+  for (var i = 0; i < SPRING_PARTICLE_COUNT; i++) {
     [].push.apply(initial_conditions, [
       0, (i % CLOTH_WIDTH) * dist, 1.8 - (i / CLOTH_WIDTH) * dist,
       0, 0, 0,
       0, 0, 0,
       Math.random(), Math.random(), Math.random(), 1,
-      0.5,
+      0.1,
       1,
       0
     ]);
@@ -513,13 +516,8 @@ function initParticleSystems() {
   spring.init(PARTICLE_SYSTEM.CLOTH,
     1, 2,
     [
-      // wind
-      ...[...particles.map(i => new Force(FORCE_TYPE.FORCE_WIND, [i]).init_vectored(INIT_VEL * Math.random() * 4,
-        Math.random() * 2 - 1,
-        Math.random() * 2 - 1,
-        Math.random() * 2 - 1))],
       // gravity
-      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity / 8),
+      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag * 4),
       // spring: cloth
@@ -531,8 +529,6 @@ function initParticleSystems() {
     ],
     new Float32Array(initial_conditions)
   );
-  // Disable wind forces
-  particles.forEach(i => spring.disableForce(i));
 }
 
 /**

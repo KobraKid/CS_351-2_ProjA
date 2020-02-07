@@ -8,7 +8,7 @@
  */
 
 var gui;
-var gui_open = true;
+var gui_open = false;
 var GuiTracker = function() {
   /* Particle System 1 */
   this.constraint_0_x_min = -1;
@@ -30,6 +30,7 @@ var GuiTracker = function() {
   this.fps = 60.0;
   this.ms = 1000.0 / 60.0; // timestep
   this.prev = Date.now();
+  this.speed = 1; // speed at which simulation should run
   /**
    * Updatets the FPS in the GUI
    */
@@ -37,7 +38,7 @@ var GuiTracker = function() {
     var now = Date.now();
     var elapsed = now - this.prev;
     this.prev = now;
-    this.ms = elapsed;
+    this.ms = elapsed / this.speed;
     tracker.fps = 1000.0 / elapsed;
   }
 }
@@ -78,8 +79,7 @@ function initGui() {
   });
   gui.add(tracker, 'clear').name('Clear screen?').listen();
   gui.add(tracker, 'pause').name('Pause').listen();
-  if (gui_open)
-    gui.close();
+  gui.close();
   document.getElementsByClassName('close-bottom')[0].onclick = function() {
     gui_open = !gui_open;
   };

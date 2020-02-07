@@ -7,10 +7,12 @@
  * @author Michael Huyler
  */
 
-keysPressed = {};
+var keysPressed = {};
+var keyPollingFrequency = 3; // Frames between key polling
+var shouldUpdateKeypress = 0;
 
 /**
- * Handles keypress events.
+ * Performs an action when a key is pressed.
  */
 function keyDown(kev) {
   var code;
@@ -20,8 +22,45 @@ function keyDown(kev) {
     code = kev.code;
   }
   keysPressed[code] = true;
+  switch (code) {
+    case "KeyP":
+    case "80":
+      tracker.pause = !tracker.pause;
+      break;
+    case "KeyO":
+      tracker.speed = 4;
+      break;
+    case "KeyC":
+    case "67":
+      tracker.clear = false;
+      break;
+    case "Period":
+    case "86":
+      toggle_help();
+      break;
+    case "Slash":
+    case "90":
+      toggle_gui();
+      break;
+    case "ArrowUp":
+    case "38":
+      // speed up to no faster than 60 FPS
+      tracker.speed = Math.max(1, parseInt(tracker.speed / 2));
+      break;
+    case "ArrowDown":
+    case "40":
+      // slow down to no slower than 4 FPS
+      tracker.speed = Math.min(16, parseInt(tracker.speed * 2));
+      break;
+    default:
+      // console.log("Unused key: " + code);
+      break;
+  }
 }
 
+/**
+ * Performs an action when a key is released.
+ */
 function keyUp(kev) {
   var code;
   if (!kev.code) {
@@ -30,33 +69,56 @@ function keyUp(kev) {
     code = kev.code;
   }
   keysPressed[code] = false;
+  switch (code) {
+    case "KeyO": // quick slo-mo
+    case "79":
+      tracker.speed = 1;
+      break;
+    case "KeyC": // show trails (don't clear the screen between draws)
+    case "67":
+      tracker.clear = true;
+      break;
+    case "Space":
+    case "32":
+      [...Array(BBALL_PARTICLE_COUNT).keys()].forEach(i => bball.disableForce(i));
+      var vertical_cloth = [];
+      for (var i = 0; i < SPRING_PARTICLE_COUNT; i++) {
+        [].push.apply(vertical_cloth, [
+          (i / CLOTH_WIDTH) * 0.05, (i % CLOTH_WIDTH) * 0.05, 1.8 + Math.cos(i / CLOTH_WIDTH) * 0.15,
+          0, 0, 0,
+          0, 0, 0,
+          Math.random(), Math.random(), Math.random(), 1,
+          0.5,
+          1,
+          0
+        ]);
+      }
+      spring.blink(new Float32Array(vertical_cloth));
+      break;
+    default:
+      // console.log("Unused key: " + code);
+      break;
+  }
 }
 
+/**
+ * Handles continuous key presses.
+ *
+ * For actions that should be performed for the entire duration of the
+ * keypress, not just on the rising/falling edge, this function will poll the
+ * key every few frames and perform a repeated action.
+ */
 function updateKeypresses() {
+  if (shouldUpdateKeypress < keyPollingFrequency) {
+    shouldUpdateKeypress++;
+    return;
+  }
+  shouldUpdateKeypress = 0;
   for (var key in keysPressed) {
     if (!keysPressed[key]) {
-      switch (key) {
-        case "KeyC":
-        case "67":
-          tracker.clear = true;
-          break;
-        case "Space":
-        case "32":
-          [...Array(BBALL_PARTICLE_COUNT).keys()].forEach(i => bball.disableForce(i));
-          [...Array(SPRING_PARTICLE_COUNT).keys()].forEach(i => spring.disableForce(i));
-          break;
-      }
       continue;
     }
     switch (key) {
-      case "KeyP":
-      case "80":
-        tracker.pause = !tracker.pause;
-        break;
-      case "KeyC":
-      case "67":
-        tracker.clear = false;
-        break;
       case "KeyW":
       case "87":
         var D = [
@@ -146,12 +208,8 @@ function updateKeypresses() {
         [...Array(BBALL_PARTICLE_COUNT).keys()].forEach(i => {
           bball.force_set[i].x = Math.random() * 2 - 1;
           bball.force_set[i].y = Math.random() * 2 - 1;
+          bball.force_set[i].z = Math.random();
           bball.enableForce(i);
-        });
-        [...Array(SPRING_PARTICLE_COUNT).keys()].forEach(i => {
-          spring.force_set[i].x = Math.random() * 2 - 1;
-          spring.force_set[i].y = Math.random() * 2 - 1;
-          spring.enableForce(i);
         });
         break;
       default:
@@ -159,6 +217,7 @@ function updateKeypresses() {
         break;
     }
   }
+  keysPressed = Object.fromEntries(Object.entries(keysPressed).filter(([k, v]) => v));
 }
 
 function mouseDown(ev) {
