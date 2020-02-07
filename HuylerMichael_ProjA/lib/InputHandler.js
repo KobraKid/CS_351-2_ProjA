@@ -143,8 +143,16 @@ function updateKeypresses() {
         break;
       case "Space":
       case "32":
-        [...Array(BBALL_PARTICLE_COUNT).keys()].forEach(i => bball.enableForce(i));
-        [...Array(SPRING_PARTICLE_COUNT).keys()].forEach(i => spring.enableForce(i));
+        [...Array(BBALL_PARTICLE_COUNT).keys()].forEach(i => {
+          bball.force_set[i].x = Math.random() * 2 - 1;
+          bball.force_set[i].y = Math.random() * 2 - 1;
+          bball.enableForce(i);
+        });
+        [...Array(SPRING_PARTICLE_COUNT).keys()].forEach(i => {
+          spring.force_set[i].x = Math.random() * 2 - 1;
+          spring.force_set[i].y = Math.random() * 2 - 1;
+          spring.enableForce(i);
+        });
         break;
       default:
         // console.log("Unused key: " + key);

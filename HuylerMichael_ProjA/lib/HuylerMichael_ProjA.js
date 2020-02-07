@@ -32,8 +32,9 @@ var vbo_boxes = [];
 var INIT_VEL = 0.15 * 60.0;
 var BBALL_PARTICLE_COUNT = 50;
 var bball = new PartSys(BBALL_PARTICLE_COUNT);
-var CLOTH_SIZE = 10;
-var SPRING_PARTICLE_COUNT = CLOTH_SIZE * CLOTH_SIZE;
+var CLOTH_WIDTH = 10;
+var CLOTH_HEIGHT = 10;
+var SPRING_PARTICLE_COUNT = CLOTH_WIDTH * CLOTH_HEIGHT;
 var spring = new PartSys(SPRING_PARTICLE_COUNT);
 var BOID_PARTICLE_COUNT = 4;
 var boid = new PartSys(BOID_PARTICLE_COUNT);
@@ -317,7 +318,7 @@ function initVBOBoxes() {
     fragment_shader_3,
     new Float32Array(7 * ( // 7 attributes
       (SPRING_PARTICLE_COUNT + 2) + // wind for each particle + 1 gravity + 1 drag
-      2 * 6 * CLOTH_SIZE * CLOTH_SIZE)), // 1 line (2 points) per spring, max 6 springs per particle
+      2 * 6 * CLOTH_WIDTH * CLOTH_HEIGHT)), // 1 line (2 points) per spring, max 6 springs per particle
     gl.LINES,
     7, {
       'a_position_3': [0, 3],
@@ -401,11 +402,22 @@ function initVBOBoxes() {
  * Initializes all of the particle systems.
  */
 function initParticleSystems() {
+  var k_s = 30; // spring constant
+  var k_d = 5; // damping coefficient
+  var dist = 0.5; // natural spring length
+  var initial_conditions;
+
   /* Particle System 2 */
   particles = [...Array(BOID_PARTICLE_COUNT).keys()];
-  boid.init(PARTICLE_SYSTEM.BOIDS,
+  boid.init(PARTICLE_SYSTEM.BOUNCY_BALL,
     4, 2,
-    [],
+    [
+      // gravity
+      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
+      // air drag
+      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
+      // new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(),
+    ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, 0.025, 2, 0, 0.975),
     ]
@@ -413,6 +425,18 @@ function initParticleSystems() {
 
   /* Particle System 3 */
   particles = [...Array(BBALL_PARTICLE_COUNT).keys()];
+  initial_conditions = [];
+  for (var i = 0; i < BBALL_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
+    [].push.apply(initial_conditions, [
+      0, -1, Math.random() * 0.5,
+      Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2,
+      0, 0, 0,
+      Math.random(), Math.random(), Math.random(), 1,
+      1,
+      1,
+      0
+    ]);
+  }
   bball.init(PARTICLE_SYSTEM.BOUNCY_BALL,
     1, 2,
     [
@@ -428,54 +452,64 @@ function initParticleSystems() {
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -2, -0.025, 0, 0.975),
-    ]
+    ],
+    new Float32Array(initial_conditions)
   );
   // Disable wind forces
   particles.forEach(i => bball.disableForce(i));
 
   /* Particle System 4 */
   particles = [...Array(SPRING_PARTICLE_COUNT).keys()];
-  var k_s = 30; // spring constant
-  var k_d = 5; // damping coefficient
-  var dist = 0.05;
+  k_s = 30;
+  k_d = 5;
+  dist = 0.05;
+  initial_conditions = [];
+  for (var i = 0; i < SPRING_PARTICLE_COUNT; i ++) {
+    [].push.apply(initial_conditions, [
+      0, (i % CLOTH_WIDTH) * dist, 1.8 - (i / CLOTH_WIDTH) * dist,
+      0, 0, 0,
+      0, 0, 0,
+      Math.random(), Math.random(), Math.random(), 1,
+      0.5,
+      1,
+      0
+    ]);
+  }
   var cloth_f = [];
   var cloth_c = [];
-  for (var i = 0; i < CLOTH_SIZE * CLOTH_SIZE; i++) {
+  for (var i = 0; i < CLOTH_WIDTH * CLOTH_HEIGHT; i++) {
     // Pin the top of the cloth
-    if (i < CLOTH_SIZE) {
+    if (i < CLOTH_WIDTH) {
       cloth_c.push(new Constraint(CONSTRAINT_TYPE.ABSOLUTE, [i], undefined, 0, i * dist, 1.8));
     }
     /* Structural Springs */
     // Horizontal
-    if (i % CLOTH_SIZE < CLOTH_SIZE - 1) {
+    if (i % CLOTH_WIDTH < CLOTH_WIDTH - 1) {
       cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + 1]).init_spring(k_s, dist, k_d));
     }
     // Vertical
-    if (i < CLOTH_SIZE * (CLOTH_SIZE - 1)) {
-      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + CLOTH_SIZE]).init_spring(k_s, dist, k_d));
+    if (i < CLOTH_WIDTH * (CLOTH_HEIGHT - 1)) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + CLOTH_WIDTH]).init_spring(k_s, dist, k_d));
     }
     /* Shear Springs */
     // Diagonal left
-    if (i < CLOTH_SIZE * (CLOTH_SIZE - 1) && i % CLOTH_SIZE < CLOTH_SIZE - 1) {
-      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + CLOTH_SIZE + 1]).init_spring(k_s, Math.sqrt(dist * dist + dist * dist), k_d));
+    if (i < CLOTH_WIDTH * (CLOTH_HEIGHT - 1) && i % CLOTH_WIDTH < CLOTH_WIDTH - 1) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + CLOTH_WIDTH + 1]).init_spring(k_s, Math.sqrt(dist * dist + dist * dist), k_d));
     }
     // Diagonal right
-    if (i < CLOTH_SIZE * (CLOTH_SIZE - 1) && i % CLOTH_SIZE > 0) {
-      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + CLOTH_SIZE - 1]).init_spring(k_s, Math.sqrt(dist * dist + dist * dist), k_d));
+    if (i < CLOTH_WIDTH * (CLOTH_HEIGHT - 1) && i % CLOTH_WIDTH > 0) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + CLOTH_WIDTH - 1]).init_spring(k_s, Math.sqrt(dist * dist + dist * dist), k_d));
     }
     /* Bend Springs */
     // Horizontal
-    if (i % CLOTH_SIZE < CLOTH_SIZE - 2) {
+    if (i % CLOTH_WIDTH < CLOTH_WIDTH - 2) {
       cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + 2]).init_spring(k_s, dist * 2, k_d));
     }
     // Vertical
-    if (i < CLOTH_SIZE * (CLOTH_SIZE - 2)) {
-      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + (CLOTH_SIZE * 2)]).init_spring(k_s, dist * 2, k_d));
+    if (i < CLOTH_WIDTH * (CLOTH_HEIGHT - 2)) {
+      cloth_f.push(new Force(FORCE_TYPE.FORCE_SPRING, [i, i + (CLOTH_WIDTH * 2)]).init_spring(k_s, dist * 2, k_d));
     }
   }
-  k_s = 10; // spring constant
-  k_d = 0; // damping coefficient
-  dist = 0.15;
   spring.init(PARTICLE_SYSTEM.CLOTH,
     1, 2,
     [
@@ -494,7 +528,8 @@ function initParticleSystems() {
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL ^ WALL.BOTTOM, -1, 1, -2, 2, 1.025, 2),
       ...cloth_c,
-    ]
+    ],
+    new Float32Array(initial_conditions)
   );
   // Disable wind forces
   particles.forEach(i => spring.disableForce(i));

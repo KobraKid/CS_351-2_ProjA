@@ -142,17 +142,25 @@ class PartSys {
    * Sets up a particular particle system, influencing its general behavior.
    *
    * @param {!PARTICLE_SYSTEM} part_sys_type The type of particle system to create.
+   * @param {VBOBox} my_vbo The VBO to render this particle system in.
+   * @param {VBOBox} constraint_vbo The VBO to render constraints in.
    * @param {Array<Force>} force_set The set of initial forces acting on this particle system.
    * @param {Array<Constraint>} constraint_set The set of initial constraints limiting this particle system.
    */
-  init(part_sys_type, my_vbo, constraint_vbo, force_set, constraint_set) {
+  init(part_sys_type, my_vbo, constraint_vbo, force_set, constraint_set, initial_conditions) {
     this._type = part_sys_type;
     this.force_set = force_set;
     this.constraint_set = constraint_set;
     this._vbo = my_vbo;
     this._c_vbo = constraint_vbo;
     this._boid_radius = 0.5;
-    this.insertGui();
+    if (initial_conditions != undefined) {
+      this._s1 = initial_conditions.slice();
+      this._s1dot = initial_conditions.slice();
+      this._s2 = initial_conditions.slice();
+      this._sM = initial_conditions.slice();
+      this._sMdot = initial_conditions.slice();
+    }
   }
 
   /**
@@ -731,6 +739,7 @@ class Constraint {
         this._x = bounds[0];
         this._y = bounds[1];
         this._z = bounds[2];
+        this._r = bounds[3];
         break;
       case CONSTRAINT_TYPE.STIFF_SPRING:
         if (affected_particles.length != 2)
@@ -896,6 +905,9 @@ class Constraint {
         }
         break;
       case CONSTRAINT_TYPE.SPHERE:
+        for (var i = 0; i < this._p.length; i++) {
+
+        }
         break;
       case CONSTRAINT_TYPE.STIFF_SPRING:
         if (Math.sqrt(
