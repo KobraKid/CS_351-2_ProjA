@@ -75,10 +75,10 @@ function main() {
   initGui();
   initParticleSystems();
   initVBOBoxes();
-  boid.constraint_set[0].draw(boid._c_vbo, true);
-  bball.constraint_set[0].draw(bball._c_vbo, true);
-  bball.constraint_set[1].draw(bball._c_vbo, true);
-  spring.constraint_set[0].draw(spring._c_vbo, true);
+  boid.constraint_set[0].draw(boid._c_vbo, true, 1, 1, 1);
+  bball.constraint_set[0].draw(bball._c_vbo, true, 1, 1, 1);
+  bball.constraint_set[1].draw(bball._c_vbo, true, 1, 1, 1);
+  spring.constraint_set[0].draw(spring._c_vbo, true, 1, 1, 1);
 
   var shouldUpdateFrame = 1;
   var tick = function() {
@@ -411,7 +411,7 @@ function initParticleSystems() {
 
   /* Particle System 2 */
   particles = [...Array(BOID_PARTICLE_COUNT).keys()];
-  boid.init(PARTICLE_SYSTEM.BOUNCY_BALL,
+  boid.init(PARTICLE_SYSTEM.BOIDS,
     4, 2,
     [
       // gravity

@@ -388,10 +388,11 @@ class PartSys {
         const attr = "c_" + hash + "_" + c_hash;
 
         // Toggle drawing this constraint
+        var redraw = function(value) {
+          this.constraint_set[i].draw(this._c_vbo, value && tracker[hash + "_drawn"], ...[...tracker[attr + "_color"].map(c => c / 255.0)]);
+        };
         tracker[attr + "_drawn"] = true;
-        partSysFolder.add(tracker, attr + "_drawn").name("Visible").onChange(function(value) {
-          this.constraint_set[i].draw(this._c_vbo, value && tracker[hash + "_drawn"]);
-        }.bind(this));
+        partSysFolder.add(tracker, attr + "_drawn").name("Visible").onChange(redraw.bind(this));
 
         switch (this.constraint_set[i].type) {
           case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
@@ -450,9 +451,45 @@ class PartSys {
               value ? this.constraint_set[i].enable() : this.constraint_set[i].disable();
             }.bind(this));
             break;
+          case CONSTRAINT_TYPE.SPHERE:
+            tracker[attr + "_x"] = this.constraint_set[i].bounds[0];
+            constraintSubFolder.add(tracker, attr + "_x", -2, 2, 0.125).name("x").onChange(function() {
+              this.constraint_set[i].x = tracker[attr + "_x"];
+              this.constraint_set[i].draw(
+                this._c_vbo,
+                tracker[attr + "_drawn"] && tracker[hash + "_drawn"],
+                ...[...tracker[attr + "_color"].map(c => c / 255.0)]);
+            }.bind(this));
+            tracker[attr + "_y"] = this.constraint_set[i].bounds[1];
+            constraintSubFolder.add(tracker, attr + "_y", -2, 2, 0.125).name("y").onChange(function() {
+              this.constraint_set[i].y = tracker[attr + "_y"];
+              this.constraint_set[i].draw(
+                this._c_vbo,
+                tracker[attr + "_drawn"] && tracker[hash + "_drawn"],
+                ...[...tracker[attr + "_color"].map(c => c / 255.0)]);
+            }.bind(this));
+            tracker[attr + "_z"] = this.constraint_set[i].bounds[2];
+            constraintSubFolder.add(tracker, attr + "_z", -2, 2, 0.125).name("z").onChange(function() {
+              this.constraint_set[i].z = tracker[attr + "_z"];
+              this.constraint_set[i].draw(
+                this._c_vbo,
+                tracker[attr + "_drawn"] && tracker[hash + "_drawn"],
+                ...[...tracker[attr + "_color"].map(c => c / 255.0)]);
+            }.bind(this));
+            tracker[attr + "_r"] = this.constraint_set[i].bounds[3];
+            constraintSubFolder.add(tracker, attr + "_r", 0.125, 4, 0.125).name("radius").onChange(function() {
+              this.constraint_set[i].r = tracker[attr + "_r"];
+              this.constraint_set[i].draw(
+                this._c_vbo,
+                tracker[attr + "_drawn"] && tracker[hash + "_drawn"],
+                ...[...tracker[attr + "_color"].map(c => c / 255.0)]);
+            }.bind(this));
+            break;
           default:
             break;
         }
+        tracker[attr + "_color"] = [255, 255, 255];
+        constraintSubFolder.addColor(tracker, attr + "_color").name("Color").onChange(redraw.bind(this));
       }
     }
   }
@@ -725,6 +762,7 @@ class Constraint {
    */
   constructor(type, affected_particles, enabled_walls = WALL.NONE, ...bounds) {
     this._type = type;
+    this._index = -1;
     switch (this._type) {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
       case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
@@ -767,6 +805,9 @@ class Constraint {
       case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
         out = [this._x_min, this._x_max, this._y_min, this._y_max, this._z_min, this._z_max];
         break;
+      case CONSTRAINT_TYPE.SPHERE:
+        out = [this._c[0], this._c[1], this._c[2], this._r];
+        break;
       default:
         out = [];
         break;
@@ -774,6 +815,36 @@ class Constraint {
     return out;
   }
 
+  set x(new_x) {
+    switch (this._type) {
+      case CONSTRAINT_TYPE.SPHERE:
+        this._c[0] = new_x;
+        break;
+      default:
+        break;
+    }
+  }
+  set y(new_y) {
+    switch (this._type) {
+      case CONSTRAINT_TYPE.SPHERE:
+        this._c[1] = new_y;
+        break;
+      default:
+        break;
+    }
+  }
+  set z(new_z) {
+    switch (this._type) {
+      case CONSTRAINT_TYPE.SPHERE:
+        this._c[2] = new_z;
+        break;
+      default:
+        break;
+    }
+  }
+  set r(new_r) {
+    this._r = new_r;
+  }
   set x_min(x) {
     this._x_min = x;
   }
@@ -954,51 +1025,48 @@ class Constraint {
    * @param {!VBOBox} vbo The VBO to update.
    * @param {boolean} enabled Whether this constraint should be drawn.
    */
-  draw(vbo, enabled) {
-    var r = Math.random();
-    var g = Math.random();
-    var b = Math.random();
-    enabled = enabled && this._enabled;
+  draw(vbo, visible, r, g, b) {
+    visible = visible && this._enabled;
     switch (this._type) {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
       case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
         vbo_boxes[vbo].reload(
           new Float32Array([
-            this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
-            this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
+            this._x_min, this._y_min, this._z_min, r, g, b, visible | 0, // 1
+            this._x_min, this._y_max, this._z_min, r, g, b, visible | 0, // 2
 
-            this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
-            this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
+            this._x_min, this._y_max, this._z_min, r, g, b, visible | 0, // 2
+            this._x_max, this._y_max, this._z_min, r, g, b, visible | 0, // 3
 
-            this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
-            this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
+            this._x_max, this._y_max, this._z_min, r, g, b, visible | 0, // 3
+            this._x_max, this._y_min, this._z_min, r, g, b, visible | 0, // 4
 
-            this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
-            this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
+            this._x_max, this._y_min, this._z_min, r, g, b, visible | 0, // 4
+            this._x_min, this._y_min, this._z_min, r, g, b, visible | 0, // 1
 
-            this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
-            this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
+            this._x_max, this._y_min, this._z_max, r, g, b, visible | 0, // 5
+            this._x_max, this._y_max, this._z_max, r, g, b, visible | 0, // 6
 
-            this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
-            this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
+            this._x_max, this._y_max, this._z_max, r, g, b, visible | 0, // 6
+            this._x_min, this._y_max, this._z_max, r, g, b, visible | 0, // 7
 
-            this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
-            this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
+            this._x_min, this._y_max, this._z_max, r, g, b, visible | 0, // 7
+            this._x_min, this._y_min, this._z_max, r, g, b, visible | 0, // 8
 
-            this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
-            this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
+            this._x_min, this._y_min, this._z_max, r, g, b, visible | 0, // 8
+            this._x_max, this._y_min, this._z_max, r, g, b, visible | 0, // 5
 
-            this._x_min, this._y_min, this._z_min, r, g, b, enabled | 0, // 1
-            this._x_min, this._y_min, this._z_max, r, g, b, enabled | 0, // 8
+            this._x_min, this._y_min, this._z_min, r, g, b, visible | 0, // 1
+            this._x_min, this._y_min, this._z_max, r, g, b, visible | 0, // 8
 
-            this._x_min, this._y_max, this._z_min, r, g, b, enabled | 0, // 2
-            this._x_min, this._y_max, this._z_max, r, g, b, enabled | 0, // 7
+            this._x_min, this._y_max, this._z_min, r, g, b, visible | 0, // 2
+            this._x_min, this._y_max, this._z_max, r, g, b, visible | 0, // 7
 
-            this._x_max, this._y_max, this._z_min, r, g, b, enabled | 0, // 3
-            this._x_max, this._y_max, this._z_max, r, g, b, enabled | 0, // 6
+            this._x_max, this._y_max, this._z_min, r, g, b, visible | 0, // 3
+            this._x_max, this._y_max, this._z_max, r, g, b, visible | 0, // 6
 
-            this._x_max, this._y_min, this._z_min, r, g, b, enabled | 0, // 4
-            this._x_max, this._y_min, this._z_max, r, g, b, enabled | 0, // 5
+            this._x_max, this._y_min, this._z_min, r, g, b, visible | 0, // 4
+            this._x_max, this._y_min, this._z_max, r, g, b, visible | 0, // 5
           ]),
           this._index * 7 * 24);
         break;
@@ -1007,65 +1075,65 @@ class Constraint {
         var corner = Math.sqrt(2) / 2;
         vbo_boxes[vbo].reload(
           new Float32Array([
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], r, g, b, enabled | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, enabled | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, visible | 0,
           ]),
           this._index * 7 * 24);
         break;
@@ -1080,6 +1148,6 @@ class Constraint {
    * @return {string} A concatination of the constraint's type and bounds.
    */
   toString() {
-    return "" + this.type + "" + this.bounds;
+    return "" + this._index + "" + this.type + "" + this.bounds;
   }
 }

@@ -8,7 +8,7 @@
  */
 
 var gui;
-var gui_open = false;
+var gui_open = true;
 var GuiTracker = function() {
   /* Particle System 1 */
   this.constraint_0_x_min = -1;
@@ -22,8 +22,6 @@ var GuiTracker = function() {
   this.gravity = 9.832;
   this.restitution = 1.0;
   this.solver = SOLVER.MIDPOINT;
-  this.bounce_type = CONSTRAINT_TYPE.VOLUME_IMPULSIVE;
-  this.fountain = false;
   this.clear = true;
   this.pause = false;
   /* FPS */
@@ -54,32 +52,20 @@ function initGui() {
     hideable: false
   });
   gui.add(tracker, 'fps', 0, 60, 1).name('FPS').listen();
-  gui.add(tracker, 'fountain').name('Fountain');
-  gui.add(tracker, 'drag', 0, 1, 0.005);
-  gui.add(tracker, 'gravity', 0);
-  gui.add(tracker, 'restitution');
-  gui.add(tracker, 'solver', {
+  gui.add(tracker, 'clear').name('Clear screen').listen();
+  gui.add(tracker, 'pause').name('Pause').listen();
+  var globals = gui.addFolder("Simulation Variables");
+  globals.add(tracker, 'drag', 0, 1, 0.005);
+  globals.add(tracker, 'gravity', 0);
+  globals.add(tracker, 'restitution');
+  globals.add(tracker, 'solver', {
     'Euler': 0,
     'Midpoint': 1,
     'Runga-Kutta': 2,
     'Iterative Backwind': 3,
     'Verlet': 4,
   });
-  gui.add(tracker, 'bounce_type', {
-    'Velocity Reverse': CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE,
-    'Impulsive': CONSTRAINT_TYPE.VOLUME_IMPULSIVE,
-  }).name('bounce type').onChange(function(value) {
-    if (value == 0) {
-      bball.removeConstraint(0);
-      bball.addConstraint(new Constraint(CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE, [...Array(PARTICLE_COUNT).keys()], 0, 0.9, 0, 0.9, 0, 0.9));
-    } else if (value == 1) {
-      bball.removeConstraint(0);
-      bball.addConstraint(new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, [...Array(PARTICLE_COUNT).keys()], 0, 0.9, 0, 0.9, 0, 0.9));
-    }
-  });
-  gui.add(tracker, 'clear').name('Clear screen?').listen();
-  gui.add(tracker, 'pause').name('Pause').listen();
-  gui.close();
+  gui.open();
   document.getElementsByClassName('close-bottom')[0].onclick = function() {
     gui_open = !gui_open;
   };
