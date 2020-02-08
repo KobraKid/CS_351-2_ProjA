@@ -15,6 +15,7 @@ const CONSTRAINT_TYPE = {
   SPHERE: 2,
   ABSOLUTE: 3,
   VOLUME_WRAP: 4,
+  EXTERNAL_VOLUME_IMPULSIVE: 5,
 };
 const CONSTRAINT_STRINGS = [
   "Volume [Impulsive]",
@@ -22,6 +23,7 @@ const CONSTRAINT_STRINGS = [
   "Sphere",
   "Absolute Position",
   "Wraparound [Impulsive]",
+  "Rectangular Prism Obstacle [Impulsive]",
 ];
 
 /**
@@ -44,7 +46,8 @@ const VISIBLE_CONSTRAINTS = [
   CONSTRAINT_TYPE.VOLUME_IMPULSIVE,
   CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE,
   CONSTRAINT_TYPE.SPHERE,
-  CONSTRAINT_TYPE.VOLUME_WRAP
+  CONSTRAINT_TYPE.VOLUME_WRAP,
+  CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE,
 ];
 // Used to keep track of what index this constraint is in the VBO
 var __constraint_volume_index = 0;
@@ -67,6 +70,7 @@ class Constraint {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
       case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
       case CONSTRAINT_TYPE.VOLUME_WRAP:
+      case CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE:
         this._x_min = bounds[0];
         this._x_max = bounds[1];
         this._y_min = bounds[2];
@@ -358,6 +362,72 @@ class Constraint {
           }
         }
         break;
+      case CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE:
+        const x_min = this._x_min;
+        const x_max = this._x_max;
+        const y_min = this._y_min;
+        const y_max = this._y_max;
+        const z_min = this._z_min;
+        const z_max = this._z_max;
+        var in_x = function(x) {
+          return (x_min < x && x < x_max);
+        }
+        var in_y = function(y) {
+          return (y_min < y && y < y_max);
+        }
+        var in_z = function(z) {
+          return (z_min < z && z < z_max);
+        }
+        for (var i = 0; i < this._p.length; i++) {
+          // If p is completely inside the volume
+          if (in_x(s2[(this._p[i] * STATE_SIZE) + STATE.P_X]) &&
+            in_y(s2[(this._p[i] * STATE_SIZE) + STATE.P_Y]) &&
+            in_z(s2[(this._p[i] * STATE_SIZE) + STATE.P_Z])) {
+            // If moving in the x direction caused a collision
+            if (in_y(s1[(this._p[i] * STATE_SIZE) + STATE.P_Y]) &&
+              in_z(s1[(this._p[i] * STATE_SIZE) + STATE.P_Z])) {
+              // If the previous state's x was less than the min x
+              if (s1[(this._p[i] * STATE_SIZE) + STATE.P_X] < this._x_min) {
+                // Place current state's x at min x
+                s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x_min;
+              } else {
+                // Otherwise place it at max x
+                s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x_max;
+              }
+              // FLip the velocity
+              s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = s1[(this._p[i] * STATE_SIZE) + STATE.V_X] * tracker.drag * tracker.restitution * -1;
+            }
+            // If moving in the y direction caused a collision
+            if (in_x(s1[(this._p[i] * STATE_SIZE) + STATE.P_X]) &&
+              in_z(s1[(this._p[i] * STATE_SIZE) + STATE.P_Z])) {
+              // If the previous state's y was less than the min y
+              if (s1[(this._p[i] * STATE_SIZE) + STATE.P_Y] < this._y_min) {
+                // Place current state's y at min y
+                s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y_min;
+              } else {
+                // Otherwise place it at max y
+                s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y_max;
+              }
+              // FLip the velocity
+              s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = s1[(this._p[i] * STATE_SIZE) + STATE.V_Y] * tracker.drag * tracker.restitution * -1;
+            }
+            // If moving in the z direction caused a collision
+            if (in_x(s1[(this._p[i] * STATE_SIZE) + STATE.P_X]) &&
+              in_y(s1[(this._p[i] * STATE_SIZE) + STATE.P_Y])) {
+              // If the previous state's z was less than the min z
+              if (s1[(this._p[i] * STATE_SIZE) + STATE.P_Z] < this._z_min) {
+                // Place current state's z at min z
+                s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_min;
+              } else {
+                // Otherwise place it at max z
+                s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_max;
+              }
+              // FLip the velocity
+              s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = s1[(this._p[i] * STATE_SIZE) + STATE.V_Z] * tracker.drag * tracker.restitution * -1;
+            }
+          }
+        }
+        break;
       default:
         return;
     }
@@ -375,6 +445,7 @@ class Constraint {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
       case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
       case CONSTRAINT_TYPE.VOLUME_WRAP:
+      case CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE:
         vbo_boxes[vbo].reload(
           new Float32Array([
             this._x_min, this._y_min, this._z_min, r, g, b, visible | 0, // 1

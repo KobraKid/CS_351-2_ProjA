@@ -103,9 +103,31 @@ class Force {
   /**
    * Creates a flocking force.
    *
-   * @param {number} radius The bois' visual radius.
+   * This approach follows Reynolds' "boids" method of flocking particles,
+   * which is affected by 3* independent, and often competing forces:
+   *  - Separation
+   *  - Alignment
+   *  - Cohesion
+   *
+   * * there can be more forces applied to boids, such as obstacle avoidance,
+   * which is, in fact, used by this implementation.
+   *
+   * @param {number} min_rad The bois' small (focused) visual radius.
+   * @param {number} max_rad The bois' large (boundary) visual radius.
+   * @param {number} binocular_angle The bois' range of binocular vision (radians).
+   * @param {number} monocular_angle The bois' range of monocular vision (radians).
+   * @param {number} k_a The avoidance hyperparameter.
+   * @param {number} k_v The velocity matching hyperparameter.
+   * @param {number} k_c The centering hyperparameter.
    */
-  init_boid(radius) {
+  init_boid(min_rad, max_rad, binocular_angle, monocular_angle, k_a, k_v, k_c) {
+    this._r1 = min_rad;
+    this._r2 = max_rad;
+    this._t1 = binocular_angle; // θ1
+    this._t2 = monocular_angle; // θ2
+    this._ka = k_a;
+    this._kv = k_v;
+    this._kc = k_c;
     return this;
   }
 
@@ -161,11 +183,13 @@ class Force {
         var L = distance - this._lr;
         // Apply Hook's Law
         // Normalize the vector [Lx, Ly, Lz], multiply L by the spring constant
-        var Fx = this._k * L * Lx / distance;
-        var Fy = this._k * L * Ly / distance;
-        var Fz = this._k * L * Lz / distance;
+        // and limit the force for stability
+        var Fx = Math.min(this._k * L * Lx / distance, 12);
+        var Fy = Math.min(this._k * L * Ly / distance, 12);
+        var Fz = Math.min(this._k * L * Lz / distance, 12);
         // Dampen the forces
-        // Multiply damping coeff. by difference in velocities of particles and by the square of the normalized L vector
+        // Multiply damping coeff. by difference in velocities of particles and
+        // by the square of the normalized L vector
         // TODO Figure out why this skews to the +y direction
         // Fx += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_X] - s[(this._p[1] * STATE_SIZE) + STATE.V_X] * Math.pow(Lx / distance, 2);
         // Fy += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Y] - s[(this._p[1] * STATE_SIZE) + STATE.V_Y] * Math.pow(Ly / distance, 2);
@@ -179,7 +203,70 @@ class Force {
         s[(this._p[1] * STATE_SIZE) + STATE.F_Z] += -Fz;
         break;
       case FORCE_TYPE.FORCE_FLOCK:
-
+        // Our current boid
+        var x_i = glMatrix.vec3.create();
+        // Our 'other' boid
+        var x_j = glMatrix.vec3.create();
+        // The vector from current to other
+        var x_ij = glMatrix.vec3.create();
+        // The directional vector from current to other
+        var x_hat = glMatrix.vec3.create();
+        // The distance from current to other
+        var d_ij = 0;
+        // The accumulated acceleration
+        var a_i = glMatrix.vec3.create(); // [a_ij^a, a_ij^v, a_ij^c]
+        // The distance weight
+        var k_d = 0;
+        // The visual field weight
+        var k_t = 1; // 0;
+        for (var i = 0; i < this._p.length; i++) {
+          x_i = glMatrix.vec3.fromValues(
+            s[(this._p[i] * STATE_SIZE) + STATE.P_X],
+            s[(this._p[i] * STATE_SIZE) + STATE.P_Y],
+            s[(this._p[i] * STATE_SIZE) + STATE.P_Z]);
+          glMatrix.vec3.zero(a_i);
+          for (var j = 0; j < this._p.length; j++) {
+            x_j = glMatrix.vec3.fromValues(
+              s[(this._p[j] * STATE_SIZE) + STATE.P_X],
+              s[(this._p[j] * STATE_SIZE) + STATE.P_Y],
+              s[(this._p[j] * STATE_SIZE) + STATE.P_Z]);
+            x_ij = glMatrix.vec3.sub(x_ij, x_j, x_i);
+            d_ij = glMatrix.vec3.length(x_ij);
+            x_hat = glMatrix.vec3.scale(x_hat, x_ij, d_ij);
+            // This boid is the current boid, is too far away, or is in a blind spot
+            if (i == j || d_ij > this._r2 /* || in blind spot */ )
+              continue;
+            k_d = d_ij < this._r1 ? 1 : (this._r2 - d_ij) / (this._r2 - this._r1);
+            // k_t = 1;
+            /* Collision avoidance */
+            // a_ij^a = -(k_a / d_ij) * x_hat
+            glMatrix.vec3.add(a_i, a_i,
+              glMatrix.vec3.scale(x_hat, x_hat, k_t * k_d * (-1 * this._ka / d_ij)));
+            /* Velocity matching */
+            // a_ij^v = k_v * (v_j - v_i)
+            glMatrix.vec3.add(a_i, a_i,
+              glMatrix.vec3.scale(
+                glMatrix.vec3.create(), // 'out' not needed
+                glMatrix.vec3.sub(
+                  glMatrix.vec3.create(), // 'out' not needed
+                  glMatrix.vec3.fromValues(
+                    s[(this._p[j] * STATE_SIZE) + STATE.V_X],
+                    s[(this._p[j] * STATE_SIZE) + STATE.V_Y],
+                    s[(this._p[j] * STATE_SIZE) + STATE.V_Z]),
+                  glMatrix.vec3.fromValues(
+                    s[(this._p[i] * STATE_SIZE) + STATE.V_X],
+                    s[(this._p[i] * STATE_SIZE) + STATE.V_Y],
+                    s[(this._p[i] * STATE_SIZE) + STATE.V_Z])),
+                k_t * k_d * this._kv));
+            /* Centering */
+            // a_ij^c = k_c * x_ij
+            glMatrix.vec3.add(a_i, a_i,
+              glMatrix.vec3.scale(x_ij, x_ij, k_t * k_d * this._kc));
+          }
+          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += a_i[0];
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += a_i[1];
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += a_i[2];
+        }
         break;
       default:
         console.log("Unimplemented force type: " + this._type);

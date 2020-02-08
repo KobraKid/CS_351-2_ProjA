@@ -231,7 +231,6 @@ class PartSys {
   solver(solver_type) {
     switch (solver_type) {
       case SOLVER.EULER:
-      case 0:
         for (var i = 0; i < this.s2.length; i++) {
           this.s2[i] = this.s1[i] + this.s1dot[i] * (tracker.ms * 0.001);
         }

@@ -36,7 +36,7 @@ var CLOTH_WIDTH = 30;
 var CLOTH_HEIGHT = 10;
 var SPRING_PARTICLE_COUNT = CLOTH_WIDTH * CLOTH_HEIGHT;
 var spring = new PartSys(SPRING_PARTICLE_COUNT);
-var BOID_PARTICLE_COUNT = 40;
+var BOID_PARTICLE_COUNT = 60;
 var boid = new PartSys(BOID_PARTICLE_COUNT);
 
 /**
@@ -78,6 +78,7 @@ function main() {
   initParticleSystems();
   initVBOBoxes();
   boid.constraint_set[0].draw(boid._c_vbo, true, 1, 1, 1);
+  boid.constraint_set[1].draw(boid._c_vbo, true, 1, 0.1, 0.1);
   fire.constraint_set[0].draw(fire._c_vbo, true, 1, 1, 1);
   fire.constraint_set[1].draw(fire._c_vbo, true, 1, 1, 1);
   spring.constraint_set[0].draw(spring._c_vbo, true, 1, 1, 1);
@@ -426,7 +427,7 @@ function initParticleSystems() {
       // Position
       Math.random() * 3 - 2, Math.random() * 5 - 3, Math.random() + 2,
       // Velocity
-      Math.random() * 2 - 1, Math.random(), Math.random() * 2 - 1,
+      Math.random() * 6 - 3, Math.random(), Math.random() * 6 - 3,
       // Force
       0, 0, 0,
       // Color
@@ -446,10 +447,11 @@ function initParticleSystems() {
       // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
       // air drag
       // new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
-      new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(),
+      new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(0.5, 1, 0, 0, 0.1, 0.1, 0.1),
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.TOP | WALL.BOTTOM, -2, 1, -3, 2, 2.025, 3),
+      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.LEFT, -0.5, 0, -1, 0, 2.025, 3),
       new Constraint(CONSTRAINT_TYPE.VOLUME_WRAP, particles, WALL.ALL ^ (WALL.TOP | WALL.BOTTOM), -2, 1, -3, 2, 2.025, 3),
     ],
     new Float32Array(initial_conditions)
