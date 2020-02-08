@@ -34,7 +34,9 @@ var GuiTracker = function() {
    */
   this.fps_calc = function() {
     var now = Date.now();
-    var elapsed = now - this.prev;
+    // prevent instability from switching tabs (since canvas does not update
+    // when not the active tab): cap elapsed time to 266 2/3 ms = ~4 FPS
+    var elapsed = Math.min(now - this.prev, 800 / 3.0);
     this.prev = now;
     this.ms = elapsed / this.speed;
     tracker.fps = 1000.0 / elapsed;

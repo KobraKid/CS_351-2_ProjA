@@ -30,13 +30,13 @@ var vbo_boxes = [];
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var BBALL_PARTICLE_COUNT = 500;
-var bball = new PartSys(BBALL_PARTICLE_COUNT);
-var CLOTH_WIDTH = 10;
+var FIRE_PARTICLE_COUNT = 1000;
+var fire = new PartSys(FIRE_PARTICLE_COUNT);
+var CLOTH_WIDTH = 30;
 var CLOTH_HEIGHT = 10;
 var SPRING_PARTICLE_COUNT = CLOTH_WIDTH * CLOTH_HEIGHT;
 var spring = new PartSys(SPRING_PARTICLE_COUNT);
-var BOID_PARTICLE_COUNT = 4;
+var BOID_PARTICLE_COUNT = 40;
 var boid = new PartSys(BOID_PARTICLE_COUNT);
 
 /**
@@ -59,6 +59,8 @@ function main() {
 
   gl.clearColor(0.2, 0.2, 0.2, 1);
   gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
   canvas.onmousedown = function(ev) {
     mouseDown(ev)
@@ -76,9 +78,11 @@ function main() {
   initParticleSystems();
   initVBOBoxes();
   boid.constraint_set[0].draw(boid._c_vbo, true, 1, 1, 1);
-  bball.constraint_set[0].draw(bball._c_vbo, true, 1, 1, 1);
-  bball.constraint_set[1].draw(bball._c_vbo, true, 1, 1, 1);
+  fire.constraint_set[0].draw(fire._c_vbo, true, 1, 1, 1);
+  fire.constraint_set[1].draw(fire._c_vbo, true, 1, 1, 1);
   spring.constraint_set[0].draw(spring._c_vbo, true, 1, 1, 1);
+  spring.constraint_set[1].draw(spring._c_vbo, true, 1, 1, 1);
+  spring.constraint_set[2].draw(spring._c_vbo, true, 1, 1, 1);
 
   var shouldUpdateFrame = 1;
   var tick = function() {
@@ -189,11 +193,12 @@ function initVBOBoxes() {
 
     attribute vec4 a_position_1;
     attribute vec4 a_color_1;
+    attribute float a_radius_1;
 
     varying vec4 v_color_1;
 
     void main() {
-      gl_PointSize = 16.0;
+      gl_PointSize = a_radius_1 * 2.0;
       gl_Position = u_projection_matrix_1 * u_view_matrix_1 * u_model_matrix_1 * a_position_1;
       v_color_1 = vec4(a_color_1);
     }`;
@@ -206,33 +211,35 @@ function initVBOBoxes() {
     void main() {
       float dist = distance(gl_PointCoord, vec2(0.5, 0.5));
       if (dist < 0.5) {
-        gl_FragColor = vec4((1.0 - 2.0 * dist) * v_color_1.rgb, 1.0);
+        gl_FragColor = v_color_1;
+        gl_FragColor.rgb *= gl_FragColor.a;
       } else { discard; }
     }`;
   vbo_1 = new VBOBox(
     vertex_shader_1,
     fragment_shader_1,
-    new Float32Array((BBALL_PARTICLE_COUNT + SPRING_PARTICLE_COUNT) * STATE_SIZE),
+    new Float32Array((FIRE_PARTICLE_COUNT + SPRING_PARTICLE_COUNT) * STATE_SIZE),
     gl.POINTS,
     STATE_SIZE, {
-      'a_position_1': [0, 3],
-      'a_color_1': [9, 4],
+      'a_position_1': [STATE.P_X, 3],
+      'a_color_1': [STATE.R, 4],
+      'a_radius_1': [STATE.RADIUS, 1],
     },
     1,
     () => {
       if (!tracker.pause) {
-        bball.applyAllForces(bball.s1);
-        bball.s1dot = bball.dotFinder(bball.s1);
-        bball.solver(Number(tracker.solver));
-        bball.doConstraints();
-        bball.render();
-        bball.swap(bball.s1, bball.s2);
+        fire.applyAllForces(fire.s1);
+        fire.s1dot = fire.dotFinder(fire.s1);
+        fire.solver(Number(tracker.solver));
+        fire.doConstraints();
+        fire.render();
+        fire.swap(fire.s1, fire.s2);
 
         spring.applyAllForces(spring.s1);
         spring.s1dot = spring.dotFinder(spring.s1);
         spring.solver(Number(tracker.solver));
         spring.doConstraints();
-        spring.render(BBALL_PARTICLE_COUNT * STATE_SIZE);
+        spring.render(FIRE_PARTICLE_COUNT * STATE_SIZE);
         spring.swap(spring.s1, spring.s2);
       }
     });
@@ -273,7 +280,7 @@ function initVBOBoxes() {
     vertex_shader_2,
     fragment_shader_2,
     // 7 attributes, 12 lines (24 points) per box constraint
-    new Float32Array(7 * (24 * 6)),
+    new Float32Array(7 * (24 * __constraint_volume_index)),
     gl.LINES,
     7, {
       'a_position_2': [0, 3],
@@ -356,11 +363,12 @@ function initVBOBoxes() {
 
     attribute vec4 a_position_4;
     attribute vec4 a_color_4;
+    attribute float a_radius_4;
 
     varying vec4 v_color_4;
 
     void main() {
-      gl_PointSize = 16.0;
+      gl_PointSize = a_radius_4 * 2.0;
       gl_Position = u_projection_matrix_4 * u_view_matrix_4 * u_model_matrix_4 * a_position_4;
       v_color_4 = vec4(a_color_4);
     }`;
@@ -382,8 +390,9 @@ function initVBOBoxes() {
     new Float32Array(BOID_PARTICLE_COUNT * STATE_SIZE),
     gl.POINTS,
     STATE_SIZE, {
-      'a_position_4': [0, 3],
-      'a_color_4': [9, 4],
+      'a_position_4': [STATE.P_X, 3],
+      'a_color_4': [STATE.R, 4],
+      'a_radius_4': [STATE.RADIUS, 1],
     },
     4,
     () => {
@@ -411,55 +420,78 @@ function initParticleSystems() {
 
   /* Particle System 2 */
   particles = [...Array(BOID_PARTICLE_COUNT).keys()];
+  initial_conditions = [];
+  for (var i = 0; i < BOID_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
+    [].push.apply(initial_conditions, [
+      // Position
+      Math.random() * 3 - 2, Math.random() * 5 - 3, Math.random() + 2,
+      // Velocity
+      Math.random() * 2 - 1, Math.random(), Math.random() * 2 - 1,
+      // Force
+      0, 0, 0,
+      // Color
+      Math.random(), Math.random(), Math.random(), 1,
+      // Mass
+      1,
+      // Radius
+      4,
+      // Age
+      0
+    ]);
+  }
   boid.init(PARTICLE_SYSTEM.BOIDS,
     4, 2,
     [
       // gravity
       // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
       // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
-      // new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(),
+      // new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
+      new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, 0.025, 2, 0, 0.975),
-    ]
-  );
-
-  /* Particle System 3 */
-  particles = [...Array(BBALL_PARTICLE_COUNT).keys()];
-  initial_conditions = [];
-  for (var i = 0; i < BBALL_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
-    [].push.apply(initial_conditions, [
-      0, -1, Math.random() * 0.5,
-      Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2,
-      0, 0, 0,
-      Math.random(), Math.random(), Math.random(), 1,
-      1,
-      1,
-      0
-    ]);
-  }
-  bball.init(PARTICLE_SYSTEM.BOUNCY_BALL,
-    1, 2,
-    [
-      // wind
-      ...[...particles.map(i => new Force(FORCE_TYPE.FORCE_WIND, [i]).init_vectored(INIT_VEL * Math.random() * 25,
-        Math.random() * 2 - 1,
-        Math.random() * 2 - 1,
-        Math.random()))],
-      // gravity
-      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
-      // air drag
-      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
-    ],
-    [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -1, 1, -2, -0.025, 0, 0.975),
-      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, undefined, 0, -1, -0.55, 0.75),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.TOP | WALL.BOTTOM, -2, 1, -3, 2, 2.025, 3),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_WRAP, particles, WALL.ALL ^ (WALL.TOP | WALL.BOTTOM), -2, 1, -3, 2, 2.025, 3),
     ],
     new Float32Array(initial_conditions)
   );
-  // Disable wind forces
-  particles.forEach(i => bball.disableForce(i));
+
+  /* Particle System 3 */
+  particles = [...Array(FIRE_PARTICLE_COUNT).keys()];
+  initial_conditions = [];
+  for (var i = 0; i < FIRE_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
+    [].push.apply(initial_conditions, [
+      // Position
+      -1, -1.5, 1,
+      // Velocity
+      0, 0, 0,
+      // Force
+      0, 0, 0,
+      // Color
+      1, 0, 0, 1,
+      // Mass
+      1,
+      // Radius
+      4,
+      // Age
+      i % 90,
+    ]);
+  }
+  fire.init(PARTICLE_SYSTEM.REEVES_FIRE,
+    1, 2,
+    [
+      // air drag
+      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
+      // Fountain effect
+      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 0, 0, 1),
+      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 1, 0, 0),
+      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 0, 1, 0),
+    ],
+    [
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -2, 1, -3, -0.025, 0, 1.975),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, undefined, -1, -1.5, 1, 0.25),
+    ],
+    new Float32Array(initial_conditions)
+  );
 
   /* Particle System 4 */
   particles = [...Array(SPRING_PARTICLE_COUNT).keys()];
@@ -469,12 +501,19 @@ function initParticleSystems() {
   initial_conditions = [];
   for (var i = 0; i < SPRING_PARTICLE_COUNT; i++) {
     [].push.apply(initial_conditions, [
-      0, (i % CLOTH_WIDTH) * dist, 1.8 - (i / CLOTH_WIDTH) * dist,
+      // Position
+      0, 0.25 + (i % CLOTH_WIDTH) * dist, 1.95 - (i / CLOTH_WIDTH) * dist,
+      // Velocity
       0, 0, 0,
+      // Force
       0, 0, 0,
-      Math.random(), Math.random(), Math.random(), 1,
+      // Color
+      1, 1, 1, 1,
+      // Mass
       0.1,
-      1,
+      // Radius
+      0.5,
+      // Age
       0
     ]);
   }
@@ -483,7 +522,7 @@ function initParticleSystems() {
   for (var i = 0; i < CLOTH_WIDTH * CLOTH_HEIGHT; i++) {
     // Pin the top of the cloth
     if (i < CLOTH_WIDTH) {
-      cloth_c.push(new Constraint(CONSTRAINT_TYPE.ABSOLUTE, [i], undefined, 0, i * dist, 1.8));
+      cloth_c.push(new Constraint(CONSTRAINT_TYPE.ABSOLUTE, [i], undefined, 0, 0.25 + i * dist, 1.95));
     }
     /* Structural Springs */
     // Horizontal
@@ -524,7 +563,9 @@ function initParticleSystems() {
       ...cloth_f,
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL ^ WALL.BOTTOM, -1, 1, -2, 2, 1.025, 2),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL ^ WALL.BOTTOM, -2, 1, 0, 2, 0, 1.975),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, undefined, -0.1, 0.65, 1, 0.5),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, undefined, 0.1, 1.5, 1.3, 0.25),
       ...cloth_c,
     ],
     new Float32Array(initial_conditions)

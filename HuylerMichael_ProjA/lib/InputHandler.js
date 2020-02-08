@@ -80,14 +80,13 @@ function keyUp(kev) {
       break;
     case "Space":
     case "32":
-      [...Array(BBALL_PARTICLE_COUNT).keys()].forEach(i => bball.disableForce(i));
       var vertical_cloth = [];
       for (var i = 0; i < SPRING_PARTICLE_COUNT; i++) {
         [].push.apply(vertical_cloth, [
-          (i / CLOTH_WIDTH) * 0.05, (i % CLOTH_WIDTH) * 0.05, 1.8 + Math.cos(i / CLOTH_WIDTH) * 0.15,
+          (i / CLOTH_WIDTH) * 0.05, 0.25 + (i % CLOTH_WIDTH) * 0.05, 1.95 + Math.cos(i / CLOTH_WIDTH) * 0.15,
           0, 0, 0,
           0, 0, 0,
-          Math.random(), Math.random(), Math.random(), 1,
+          1, 1, 1, 1,
           0.5,
           1,
           0
@@ -202,15 +201,6 @@ function updateKeypresses() {
         theta -= 0.05;
         g_perspective_lookat[0] = g_perspective_eye[0] + Math.cos(theta);
         g_perspective_lookat[1] = g_perspective_eye[1] + Math.sin(theta);
-        break;
-      case "Space":
-      case "32":
-        [...Array(BBALL_PARTICLE_COUNT).keys()].forEach(i => {
-          bball.force_set[i].x = Math.random() * 2 - 1;
-          bball.force_set[i].y = Math.random() * 2 - 1;
-          bball.force_set[i].z = Math.random();
-          bball.enableForce(i);
-        });
         break;
       default:
         // console.log("Unused key: " + key);
