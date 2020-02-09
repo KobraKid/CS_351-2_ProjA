@@ -202,12 +202,12 @@ class VBOBox {
   validate() {
     if (gl.getParameter(gl.CURRENT_PROGRAM) != this.shader_loc) {
       console.log(this.constructor.name +
-        '.validate(): shader program at this.shader_loc not in use!');
+        '.validate(): shader program at this.shader_loc not in use! ' + this.index);
       return false;
     }
     if (gl.getParameter(gl.ARRAY_BUFFER_BINDING) != this.vbo_loc) {
       console.log(this.constructor.name +
-        '.validate(): vbo at this.vbo_loc not in use!');
+        '.validate(): vbo at this.vbo_loc not in use! ' + this.index);
       return false;
     }
     return true;

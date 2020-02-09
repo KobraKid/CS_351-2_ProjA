@@ -27,7 +27,7 @@ var GuiTracker = function() {
   /* FPS */
   this.fps = 60.0;
   this.ms = 1000.0 / 60.0; // timestep
-  this.prev = Date.now();
+  this.prev;
   this.speed = 1; // speed at which simulation should run
   /**
    * Updatets the FPS in the GUI

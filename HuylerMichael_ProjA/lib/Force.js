@@ -213,6 +213,8 @@ class Force {
         var x_hat = glMatrix.vec3.create();
         // The distance from current to other
         var d_ij = 0;
+        // The angle between current and other
+        var t_ij = 0;
         // The accumulated acceleration
         var a_i = glMatrix.vec3.create(); // [a_ij^a, a_ij^v, a_ij^c]
         // The distance weight
@@ -232,12 +234,17 @@ class Force {
               s[(this._p[j] * STATE_SIZE) + STATE.P_Z]);
             x_ij = glMatrix.vec3.sub(x_ij, x_j, x_i);
             d_ij = glMatrix.vec3.length(x_ij);
+            t_ij = glMatrix.vec3.angle(x_ij,
+              glMatrix.vec3.fromValues(
+                s[(this._p[j] * STATE_SIZE) + STATE.V_X],
+                s[(this._p[j] * STATE_SIZE) + STATE.V_Y],
+                s[(this._p[j] * STATE_SIZE) + STATE.V_Z]));
             x_hat = glMatrix.vec3.scale(x_hat, x_ij, d_ij);
             // This boid is the current boid, is too far away, or is in a blind spot
-            if (i == j || d_ij > this._r2 /* || in blind spot */ )
+            if (i == j || d_ij == 0 || d_ij > this._r2 || t_ij > this._t2 * 0.5)
               continue;
             k_d = d_ij < this._r1 ? 1 : (this._r2 - d_ij) / (this._r2 - this._r1);
-            // k_t = 1;
+            k_t = t_ij < (this._t1 * 0.5) ? 1 : (this._t2 * 0.5 - t_ij) / (this._t2 * 0.5 - this._t1 * 0.5);
             /* Collision avoidance */
             // a_ij^a = -(k_a / d_ij) * x_hat
             glMatrix.vec3.add(a_i, a_i,
@@ -262,6 +269,7 @@ class Force {
             // a_ij^c = k_c * x_ij
             glMatrix.vec3.add(a_i, a_i,
               glMatrix.vec3.scale(x_ij, x_ij, k_t * k_d * this._kc));
+            if (Number.isNaN(a_i[0])) {console.log(x_i, x_j, x_ij, d_ij, t_ij, k_d, k_t, x_hat)}
           }
           s[(this._p[i] * STATE_SIZE) + STATE.F_X] += a_i[0];
           s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += a_i[1];
