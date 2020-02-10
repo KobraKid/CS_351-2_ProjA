@@ -63,7 +63,7 @@ class Constraint {
    * @param {!WALL=} enabled_walls The walls to enable for this constraint.
    * @param {...number} bounds The rest of the arguments are all numbers which bound the constraint.
    */
-  constructor(type, affected_particles, enabled_walls = WALL.NONE, ...bounds) {
+  constructor(type, affected_particles, enabled_walls = WALL.NONE, restitution, ...bounds) {
     this._type = type;
     this._index = -1;
     switch (this._type) {
@@ -97,6 +97,7 @@ class Constraint {
     }
     this._p = affected_particles;
     this._walls = enabled_walls;
+    this._restitution = restitution;
     this._enabled = true;
   }
 
@@ -111,6 +112,7 @@ class Constraint {
     switch (this.type) {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
       case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
+      case CONSTRAINT_TYPE.VOLUME_WRAP:
         out = [this._x_min, this._x_max, this._y_min, this._y_max, this._z_min, this._z_max];
         break;
       case CONSTRAINT_TYPE.SPHERE:
@@ -121,6 +123,9 @@ class Constraint {
         break;
     }
     return out;
+  }
+  get restitution() {
+    return this._restitution;
   }
 
   set x(new_x) {
@@ -171,6 +176,9 @@ class Constraint {
   set z_max(z) {
     this._z_max = z;
   }
+  set restitution(r) {
+    this._restitution = r;
+  }
 
   /**
    * Enables this constraint.
@@ -204,7 +212,7 @@ class Constraint {
             s2[(this._p[i] * STATE_SIZE) + STATE.V_X] <= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x_min;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_X] =
-              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_X]) * tracker.drag * tracker.restitution;
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_X]) * tracker.drag * this._restitution;
           }
           // bounce on right wall
           if ((this._walls & WALL.RIGHT) &&
@@ -212,7 +220,7 @@ class Constraint {
             s2[(this._p[i] * STATE_SIZE) + STATE.V_X] >= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x_max;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_X] =
-              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_X]) * tracker.drag * tracker.restitution * -1;
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_X]) * tracker.drag * this._restitution * -1;
           }
           // bounce on front wall
           if ((this._walls & WALL.FRONT) &&
@@ -220,7 +228,7 @@ class Constraint {
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] <= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y_min;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] =
-              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Y]) * tracker.drag * tracker.restitution;
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Y]) * tracker.drag * this._restitution;
           }
           // bounce on back wall
           if ((this._walls & WALL.BACK) &&
@@ -228,7 +236,7 @@ class Constraint {
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] >= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y_max;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] =
-              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Y]) * tracker.drag * tracker.restitution * -1;
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Y]) * tracker.drag * this._restitution * -1;
           }
           // bounce on floor
           if ((this._walls & WALL.BOTTOM) &&
@@ -236,7 +244,7 @@ class Constraint {
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] <= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_min;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] =
-              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Z]) * tracker.drag * tracker.restitution;
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Z]) * tracker.drag * this._restitution;
           }
           // bounce on ceiling
           if ((this._walls & WALL.TOP) &&
@@ -244,7 +252,7 @@ class Constraint {
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] >= 0.0) {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_max;
             s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] =
-              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Z]) * tracker.drag * tracker.restitution * -1;
+              Math.abs(s1[(this._p[i] * STATE_SIZE) + STATE.V_Z]) * tracker.drag * this._restitution * -1;
           }
         }
         break;
@@ -252,27 +260,27 @@ class Constraint {
         for (var i = 0; i < this._p.length; i++) {
           // bounce on left wall
           if (s2[(this._p[i] * STATE_SIZE) + STATE.P_X] < this._x_min && s2[(this._p[i] * STATE_SIZE) + STATE.V_X] < 0.0) {
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_X];
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = -this._restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_X];
           }
           // bounce on right wall
           if (s2[(this._p[i] * STATE_SIZE) + STATE.P_X] > this._x_max && s2[(this._p[i] * STATE_SIZE) + STATE.V_X] > 0.0) {
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_X];
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = -this._restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_X];
           }
           // bounce on front wall
           if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] < this._y_min && s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] < 0.0) {
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Y];
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = -this._restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Y];
           }
           // bounce on back wall
           if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] > this._y_max && s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] > 0.0) {
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Y];
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = -this._restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Y];
           }
           // bounce on floor
           if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] < this._z_min && s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] < 0.0) {
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Z];
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = -this._restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Z];
           }
           // bounce on ceiling
           if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] > this._z_max && s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] > 0.0) {
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = -tracker.restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Z];
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = -this._restitution * s2[(this._p[i] * STATE_SIZE) + STATE.V_Z];
           }
           // hard limit on 'floor' keeps z position >= 0;
           if (s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] < this._z_min) {
@@ -306,9 +314,9 @@ class Constraint {
             s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = part_pos[0];
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = part_pos[1];
             s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = part_pos[2];
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = part_vel[0] * tracker.restitution;
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = part_vel[1] * tracker.restitution;
-            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = part_vel[2] * tracker.restitution;
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = part_vel[0] * this._restitution;
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = part_vel[1] * this._restitution;
+            s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = part_vel[2] * this._restitution;
           }
         }
         break;
@@ -395,7 +403,7 @@ class Constraint {
                 s2[(this._p[i] * STATE_SIZE) + STATE.P_X] = this._x_max;
               }
               // FLip the velocity
-              s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = s1[(this._p[i] * STATE_SIZE) + STATE.V_X] * tracker.drag * tracker.restitution * -1;
+              s2[(this._p[i] * STATE_SIZE) + STATE.V_X] = s1[(this._p[i] * STATE_SIZE) + STATE.V_X] * tracker.drag * this._restitution * -1;
             }
             // If moving in the y direction caused a collision
             if (in_x(s1[(this._p[i] * STATE_SIZE) + STATE.P_X]) &&
@@ -409,7 +417,7 @@ class Constraint {
                 s2[(this._p[i] * STATE_SIZE) + STATE.P_Y] = this._y_max;
               }
               // FLip the velocity
-              s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = s1[(this._p[i] * STATE_SIZE) + STATE.V_Y] * tracker.drag * tracker.restitution * -1;
+              s2[(this._p[i] * STATE_SIZE) + STATE.V_Y] = s1[(this._p[i] * STATE_SIZE) + STATE.V_Y] * tracker.drag * this._restitution * -1;
             }
             // If moving in the z direction caused a collision
             if (in_x(s1[(this._p[i] * STATE_SIZE) + STATE.P_X]) &&
@@ -423,7 +431,7 @@ class Constraint {
                 s2[(this._p[i] * STATE_SIZE) + STATE.P_Z] = this._z_max;
               }
               // FLip the velocity
-              s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = s1[(this._p[i] * STATE_SIZE) + STATE.V_Z] * tracker.drag * tracker.restitution * -1;
+              s2[(this._p[i] * STATE_SIZE) + STATE.V_Z] = s1[(this._p[i] * STATE_SIZE) + STATE.V_Z] * tracker.drag * this._restitution * -1;
             }
           }
         }

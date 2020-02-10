@@ -17,7 +17,7 @@ var aspect;
 /* VBO Boxes */
 // Ground plane
 var vbo_0;
-// Bouncy Balls
+// ???
 var vbo_1;
 // Boids
 var vbo_2;
@@ -35,14 +35,20 @@ const sprite_locations = {};
 
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
-var FIRE_PARTICLE_COUNT = 500;
-var fire = new PartSys(FIRE_PARTICLE_COUNT);
-var CLOTH_WIDTH = 30;
-var CLOTH_HEIGHT = 10;
-var SPRING_PARTICLE_COUNT = CLOTH_WIDTH * CLOTH_HEIGHT;
-var spring = new PartSys(SPRING_PARTICLE_COUNT);
-var BOID_PARTICLE_COUNT = 40;
-var boid = new PartSys(BOID_PARTICLE_COUNT);
+// Vector Field
+const VEC_FIELD_PARTICLE_COUNT = 300;
+const vfield = new PartSys(VEC_FIELD_PARTICLE_COUNT);
+// Boids
+const BOID_PARTICLE_COUNT = 40;
+const boid = new PartSys(BOID_PARTICLE_COUNT);
+// Reve's Fire
+const FIRE_PARTICLE_COUNT = 500;
+const fire = new PartSys(FIRE_PARTICLE_COUNT);
+// Springs
+const CLOTH_WIDTH = 30;
+const CLOTH_HEIGHT = 10;
+const SPRING_PARTICLE_COUNT = CLOTH_WIDTH * CLOTH_HEIGHT;
+const spring = new PartSys(SPRING_PARTICLE_COUNT);
 
 /**
  * Initialize global variables, event listeners, etc.
@@ -63,7 +69,7 @@ function main() {
   }
 
   gl.clearColor(0.2, 0.2, 0.2, 1);
-  gl.enable(gl.DEPTH_TEST);
+  gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -82,6 +88,7 @@ function main() {
   initGui();
   initParticleSystems();
   initVBOBoxes();
+  vfield.constraint_set[0].draw(vfield._c_vbo, true, 1, 1, 1);
   boid.constraint_set[0].draw(boid._c_vbo, true, 1, 1, 1);
   boid.constraint_set[1].draw(boid._c_vbo, true, 1, 0.1, 0.1);
   fire.constraint_set[0].draw(fire._c_vbo, true, 1, 1, 1);
@@ -114,6 +121,7 @@ function main() {
  */
 function initVBOBoxes() {
   var id;
+  var glTexture;
 
   // Ground plane
   id = 0;
@@ -196,7 +204,7 @@ function initVBOBoxes() {
   vbo_0.init();
   vbo_boxes.push(vbo_0);
 
-  // Demo
+  // Vector Field
   id = 1;
   const vertex_shader_1 = `
     precision highp float;
@@ -219,23 +227,48 @@ function initVBOBoxes() {
   const fragment_shader_1 = `
     precision highp float;
 
+    uniform sampler2D sprite_texture_${id};
+
     varying vec4 v_color_${id};
 
     void main() {
-      gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+      gl_FragColor = texture2D(sprite_texture_${id}, gl_PointCoord) * v_color_${id};
+      // float dist = distance(gl_PointCoord, vec2(0.5, 0.5));
+      // if (dist < 0.5) {
+      //   gl_FragColor = v_color_${id};
+      //   gl_FragColor.rgb *= gl_FragColor.a;
+      // } else { discard; }
     }
   `;
+  const snow_sprite = document.getElementById('fluff');
+  const snow_sprite_id = id;
+  glTexture = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, glTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, snow_sprite);
+  gl.generateMipmap(gl.TEXTURE_2D);
   vbo_1 = new VBOBox(vertex_shader_1,
     fragment_shader_1,
-    verts,
+    new Float32Array(VEC_FIELD_PARTICLE_COUNT * STATE_SIZE),
     gl.POINTS,
-    7, {
-      ['a_position_' + id]: [0, 4],
-      ['a_color_' + id]: [4, 3],
+    STATE_SIZE, {
+      ['a_position_' + id]: [STATE.P_X, 3],
+      ['a_color_' + id]: [STATE.R, 4],
     },
     id,
-    () => {});
+    () => {
+      if (!tracker.pause) {
+        vfield.applyAllForces(vfield.s1);
+        vfield.s1dot = vfield.dotFinder(vfield.s1);
+        vfield.solver(Number(tracker.solver));
+        vfield.doConstraints();
+        gl.uniform1i(sprite_locations[snow_sprite_id], snow_sprite_id);
+        vfield.render();
+        vfield.swap(vfield.s1, vfield.s2);
+      }
+    });
   vbo_1.init();
+  sprite_locations[snow_sprite_id] = gl.getUniformLocation(vbo_1.program, `sprite_texture_${snow_sprite_id}`);
   vbo_boxes.push(vbo_1);
 
   // Boids
@@ -268,9 +301,9 @@ function initVBOBoxes() {
     void main() {
       gl_FragColor = texture2D(sprite_texture_${id}, gl_PointCoord) * v_color_${id};
     }`;
-  const boid_sprite = document.getElementById('icon');
+  const boid_sprite = document.getElementById('boid');
   const boid_sprite_id = id;
-  const glTexture = gl.createTexture();
+  glTexture = gl.createTexture();
   gl.activeTexture(gl.TEXTURE2);
   gl.bindTexture(gl.TEXTURE_2D, glTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, boid_sprite);
@@ -324,15 +357,20 @@ function initVBOBoxes() {
   const fragment_shader_3 = `
     precision mediump float;
 
+    uniform sampler2D sprite_texture_${id};
+
     varying vec4 v_color_${id};
 
     void main() {
-      float dist = distance(gl_PointCoord, vec2(0.5, 0.5));
-      if (dist < 0.5) {
-        gl_FragColor = v_color_${id};
-        gl_FragColor.rgb *= gl_FragColor.a;
-      } else { discard; }
+      gl_FragColor = texture2D(sprite_texture_${id}, gl_PointCoord) * v_color_${id};
     }`;
+  const fire_sprite = document.getElementById('fluff');
+  const fire_sprite_id = id;
+  glTexture = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, glTexture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, fire_sprite);
+  gl.generateMipmap(gl.TEXTURE_2D);
   vbo_3 = new VBOBox(
     vertex_shader_3,
     fragment_shader_3,
@@ -350,11 +388,13 @@ function initVBOBoxes() {
         fire.s1dot = fire.dotFinder(fire.s1);
         fire.solver(Number(tracker.solver));
         fire.doConstraints();
+        gl.uniform1i(sprite_locations[fire_sprite_id], fire_sprite_id);
         fire.render();
         fire.swap(fire.s1, fire.s2);
       }
     });
   vbo_3.init();
+  sprite_locations[fire_sprite_id] = gl.getUniformLocation(vbo_3.program, `sprite_texture_${fire_sprite_id}`);
   vbo_boxes.push(vbo_3);
 
   // Springs
@@ -536,6 +576,41 @@ function initParticleSystems() {
   var dist = 0.5; // natural spring length
   var initial_conditions;
 
+  /* Particle System 1 */
+  particles = [...Array(VEC_FIELD_PARTICLE_COUNT).keys()];
+  initial_conditions = [];
+  for (var i = 0; i < VEC_FIELD_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
+    [].push.apply(initial_conditions, [
+      // Position
+      Math.random() * 4 + 1, Math.random() * 3 + 2, Math.random() * 3,
+      // Velocity
+      0, 0, 0,
+      // Force
+      0, 0, 0,
+      // Color
+      Math.random() * 0.1 + 0.9, Math.random() * 0.1 + 0.9, Math.random() * 0.1 + 0.9, 0.75,
+      // Mass
+      0.1,
+      // Radius
+      Math.random() * 4,
+      // Age
+      i / STATE_SIZE
+    ]);
+  }
+  vfield.init(PARTICLE_SYSTEM.SNOW,
+    1, 5,
+    [
+      // gravity
+      new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
+      // air drag
+      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
+    ],
+    [
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, 0.1, 1, 5, 2, 5, 0, 3),
+    ],
+    new Float32Array(initial_conditions)
+  );
+
   /* Particle System 2: Boids */
   particles = [...Array(BOID_PARTICLE_COUNT).keys()];
   initial_conditions = [];
@@ -570,9 +645,9 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(0.5, 1, (2 * Math.PI) * (1 / 4), (2 * Math.PI) * (1 / 2), 0.1, 0.1, 0.1),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.TOP | WALL.BOTTOM, -2, 1, -3, 2, 2.025, 3),
-      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.LEFT, -0.5, 0, -1, 0, 2.025, 3),
-      new Constraint(CONSTRAINT_TYPE.VOLUME_WRAP, particles, WALL.ALL ^ (WALL.TOP | WALL.BOTTOM), -2, 1, -3, 2, 2.025, 3),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.TOP | WALL.BOTTOM, tracker.restitution, -2, 1, -3, 2, 2.025, 3),
+      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.LEFT, tracker.restitution, -0.5, 0, -1, 0, 2.025, 3),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_WRAP, particles, WALL.ALL ^ (WALL.TOP | WALL.BOTTOM), 0, -2, 1, -3, 2, 2.025, 3),
     ],
     new Float32Array(initial_conditions)
   );
@@ -589,11 +664,11 @@ function initParticleSystems() {
       // Force
       0, 0, 0,
       // Color
-      1, 0, 0, 1,
+      0.7, 0, 0, 0.5,
       // Mass
       1,
       // Radius
-      4,
+      12,
       // Age
       i % 90,
     ]);
@@ -609,8 +684,8 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 0, 1, 0),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, -2, 1, -3, -0.025, 0, 1.975),
-      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, undefined, -0.5, -1.5, 1, 0.25),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, tracker.restitution, -2, 1, -3, -0.025, 0, 1.975),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, 0, -0.5, -1.5, 1, 0.25),
     ],
     new Float32Array(initial_conditions)
   );
@@ -644,7 +719,7 @@ function initParticleSystems() {
   for (var i = 0; i < CLOTH_WIDTH * CLOTH_HEIGHT; i++) {
     // Pin the top of the cloth
     if (i < CLOTH_WIDTH) {
-      cloth_c.push(new Constraint(CONSTRAINT_TYPE.ABSOLUTE, [i], undefined, 0, 0.25 + i * dist, 1.95));
+      cloth_c.push(new Constraint(CONSTRAINT_TYPE.ABSOLUTE, [i], undefined, tracker.restitution, 0, 0.25 + i * dist, 1.95));
     }
     /* Structural Springs */
     // Horizontal
@@ -685,9 +760,9 @@ function initParticleSystems() {
       ...cloth_f,
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL ^ WALL.BOTTOM, -2, 1, 0, 2, 0, 1.975),
-      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, undefined, -0.1, 0.65, 1, 0.5),
-      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, undefined, 0.1, 1.5, 1.3, 0.25),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL ^ WALL.BOTTOM, tracker.restitution, -2, 1, 0, 2, 0, 1.975),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, -0.1, 0.65, 1, 0.5),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, 0.1, 1.5, 1.3, 0.25),
       ...cloth_c,
     ],
     new Float32Array(initial_conditions)

@@ -10,12 +10,12 @@
  * @enum {number}
  */
 const PARTICLE_SYSTEM = {
-  BOUNCY_BALL: 0,
+  SNOW: 0,
   CLOTH: 1,
   BOIDS: 2,
   REEVES_FIRE: 3,
 };
-const PARTICLE_SYSTEM_STRINGS = ["Bouncy Ball", "Cloth Simulation", "Boids", "Reeve's Fire"];
+const PARTICLE_SYSTEM_STRINGS = ["Snow", "Cloth Simulation", "Boids", "Reeve's Fire"];
 
 /**
  * States stored in a state array.
@@ -251,6 +251,24 @@ class PartSys {
         console.log('unknown solver: ' + solver_type);
         break;
     }
+    // For Snow, we care about age
+    if (this._type == PARTICLE_SYSTEM.SNOW) {
+      for (var i = 0; i < this.s2.length / STATE_SIZE; i++) {
+        // Decrement age
+        this.s2[(i * STATE_SIZE) + STATE.AGE] -= 1;
+        if (this.s2[(i * STATE_SIZE) + STATE.AGE] < 0) {
+          // Reset age
+          this.s2[(i * STATE_SIZE) + STATE.AGE] = 300;
+          // Make it fall again
+          this.s2[(i * STATE_SIZE) + STATE.P_X] = Math.random() * 4 + 1;
+          this.s2[(i * STATE_SIZE) + STATE.P_Y] = Math.random() * 3 + 2;
+          this.s2[(i * STATE_SIZE) + STATE.P_Z] = 3;
+          this.s2[(i * STATE_SIZE) + STATE.V_X] = 0;
+          this.s2[(i * STATE_SIZE) + STATE.V_Y] = 0;
+          this.s2[(i * STATE_SIZE) + STATE.V_Z] = 0;
+        }
+      }
+    }
     // For Reeve's fire, alpha depends on z position, and we care about age
     if (this._type == PARTICLE_SYSTEM.REEVES_FIRE) {
       var sphere = this.constraint_set[1].bounds;
@@ -272,6 +290,7 @@ class PartSys {
           this.s2[(i * STATE_SIZE) + STATE.P_Z] = Math.min(Math.max(z + sphere[2], min), max);
         }
         // Set alpha according to distance from edge of sphere
+        // TODO: Set color based on flame temp?
         var dist = glMatrix.vec3.distance(
           glMatrix.vec3.fromValues(
             sphere[0],
@@ -281,11 +300,11 @@ class PartSys {
             this.s2[(i * STATE_SIZE) + STATE.P_X],
             this.s2[(i * STATE_SIZE) + STATE.P_Y],
             this.s2[(i * STATE_SIZE) + STATE.P_Z])) - r;
-        this.s2[(i * STATE_SIZE) + STATE.A] = 1 - (dist / (1.5 * r));
+        this.s2[(i * STATE_SIZE) + STATE.A] = 0.7 - (dist / (1.5 * r));
         if (this.s2[(i * STATE_SIZE) + STATE.A] < 0.2)
           this.s2[(i * STATE_SIZE) + STATE.A] = 0.2;
-        if (this.s2[(i * STATE_SIZE) + STATE.A] > 1)
-          this.s2[(i * STATE_SIZE) + STATE.A] = 1;
+        if (this.s2[(i * STATE_SIZE) + STATE.A] > 0.7)
+          this.s2[(i * STATE_SIZE) + STATE.A] = 0.7;
       }
     }
   }
@@ -434,6 +453,11 @@ class PartSys {
         switch (this.constraint_set[i].type) {
           case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
           case CONSTRAINT_TYPE.VOLUME_VELOCITY_REVERSE:
+            tracker[attr + "_restitution"] = this.constraint_set[i].restitution;
+            constraintSubFolder.add(tracker, attr + "_restitution").name("restitution").onChange(function() {
+              this.constraint_set[i].restitution = tracker[attr + "_restitution"];
+            }.bind(this));
+          case CONSTRAINT_TYPE.VOLUME_WRAP:
             // Adjust this constraint's bounds
             tracker[attr + "_x_min"] = this.constraint_set[i].bounds[0];
             constraintSubFolder.add(tracker, attr + "_x_min").name("x-min").onChange(function() {
