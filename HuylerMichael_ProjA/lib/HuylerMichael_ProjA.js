@@ -364,7 +364,7 @@ function initVBOBoxes() {
     void main() {
       gl_FragColor = texture2D(sprite_texture_${id}, gl_PointCoord) * v_color_${id};
     }`;
-  const fire_sprite = document.getElementById('fluff');
+  const fire_sprite = document.getElementById('grad');
   const fire_sprite_id = id;
   glTexture = gl.createTexture();
   gl.activeTexture(gl.TEXTURE3);
@@ -576,7 +576,7 @@ function initParticleSystems() {
   var dist = 0.5; // natural spring length
   var initial_conditions;
 
-  /* Particle System 1 */
+  /* Particle System 1: Snow */
   particles = [...Array(VEC_FIELD_PARTICLE_COUNT).keys()];
   initial_conditions = [];
   for (var i = 0; i < VEC_FIELD_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
@@ -604,6 +604,8 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
+      // attractor
+      new Force(FORCE_TYPE.FORCE_LINE_ATTRACTOR, particles).init_attractor(/* pos */ 1, 3.5, 1.5, /* a */ 1, 0, 0, /* p, L */ 2, 2),
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, 0.1, 1, 5, 2, 5, 0, 3),

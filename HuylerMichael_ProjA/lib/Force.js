@@ -14,9 +14,9 @@ const FORCE_TYPE = {
   FORCE_DRAG: 1,
   FORCE_WIND: 2,
   FORCE_SPRING: 3,
-  FORCE_CHARGE: 4,
-  FORCE_FLOCK: 5,
-  FORCE_GRAVITY: 6,
+  FORCE_FLOCK: 4,
+  FORCE_PLANETARY_GRAVITY: 5,
+  FORCE_LINE_ATTRACTOR: 6,
 };
 
 // How long the force should stay active
@@ -128,6 +128,17 @@ class Force {
     this._ka = k_a;
     this._kv = k_v;
     this._kc = k_c;
+    return this;
+  }
+
+  /**
+   * Initializes an attractor force.
+   */
+  init_attractor(x, y, z, a_x, a_y, a_z, p, L = 0) {
+    this._x_a = glMatrix.vec3.fromValues(x, y, z);
+    this._a = glMatrix.vec3.fromValues(a_x, a_y, a_z);
+    this._pow = p;
+    this._L = L;
     return this;
   }
 
@@ -269,11 +280,41 @@ class Force {
             // a_ij^c = k_c * x_ij
             glMatrix.vec3.add(a_i, a_i,
               glMatrix.vec3.scale(x_ij, x_ij, k_t * k_d * this._kc));
-            if (Number.isNaN(a_i[0])) {console.log(x_i, x_j, x_ij, d_ij, t_ij, k_d, k_t, x_hat)}
+            if (Number.isNaN(a_i[0])) {
+              console.log(x_i, x_j, x_ij, d_ij, t_ij, k_d, k_t, x_hat)
+            }
           }
           s[(this._p[i] * STATE_SIZE) + STATE.F_X] += a_i[0];
           s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += a_i[1];
           s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += a_i[2];
+        }
+        break;
+      case FORCE_TYPE.FORCE_LINE_ATTRACTOR:
+        const x_a = this._x_a;
+        const a = this._a;
+        var x_i = glMatrix.vec3.create();
+        var x_ai = glMatrix.vec3.create();
+        var l_ai = 0;
+        var r_ai = glMatrix.vec3.create();
+        var r = 0; // magnitude of r_ai
+        var a_ai = glMatrix.vec3.create();
+        var epsilon = 0.01;
+        for (var i = 0; i < this._p.length; i++) {
+          x_i = glMatrix.vec3.fromValues(
+            s[(this._p[i] * STATE_SIZE) + STATE.P_X],
+            s[(this._p[i] * STATE_SIZE) + STATE.P_Y],
+            s[(this._p[i] * STATE_SIZE) + STATE.P_Z]
+          );
+          x_ai = glMatrix.vec3.sub(x_ai, x_i, x_a);
+          l_ai = glMatrix.vec3.dot(x_ai, a);
+          if (epsilon <= l_ai && l_ai < this._L) {
+            r_ai = glMatrix.vec3.scaleAndAdd(r_ai, x_ai, a, -l_ai);
+            r = glMatrix.vec3.len(r_ai);
+            a_ai = glMatrix.vec3.scale(a_ai, r_ai, -9.8 * Math.pow(r, -(this._pow + 1)));
+            s[(this._p[i] * STATE_SIZE) + STATE.F_X] += a_ai[0];
+            s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += a_ai[1];
+            s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += a_ai[2];
+          }
         }
         break;
       default:

@@ -279,8 +279,11 @@ class PartSys {
         // Decrement age
         this.s2[(i * STATE_SIZE) + STATE.AGE] -= 1;
         if (this.s2[(i * STATE_SIZE) + STATE.AGE] < 0) {
-          // Reset age
+          // Reset age, color
           this.s2[(i * STATE_SIZE) + STATE.AGE] = 60;
+          this.s2[(i * STATE_SIZE) + STATE.R] = 1;
+          this.s2[(i * STATE_SIZE) + STATE.G] = 1;
+          this.s2[(i * STATE_SIZE) + STATE.B] = 1;
           // Place on the surface of the sphere
           var z = Math.random() * (sphere[3] + sphere[3]) - sphere[3];
           var φ = Math.random() * 2 * Math.PI;
@@ -289,8 +292,11 @@ class PartSys {
           this.s2[(i * STATE_SIZE) + STATE.P_Y] = r * Math.sin(θ) * Math.sin(φ) + sphere[1];
           this.s2[(i * STATE_SIZE) + STATE.P_Z] = Math.min(Math.max(z + sphere[2], min), max);
         }
+        // Older particles cool off (become less white)
+        this.s2[(i * STATE_SIZE) + STATE.R] *= 1;
+        this.s2[(i * STATE_SIZE) + STATE.G] *= 0.97;
+        this.s2[(i * STATE_SIZE) + STATE.B] *= 0.7;
         // Set alpha according to distance from edge of sphere
-        // TODO: Set color based on flame temp?
         var dist = glMatrix.vec3.distance(
           glMatrix.vec3.fromValues(
             sphere[0],
