@@ -61,11 +61,9 @@ function initGui() {
   globals.add(tracker, 'gravity', 0);
   globals.add(tracker, 'restitution');
   globals.add(tracker, 'solver', {
-    'Euler': 0,
-    'Midpoint': 1,
-    'Runga-Kutta': 2,
-    'Iterative Backwind': 3,
-    'Verlet': 4,
+    'Euler': SOLVER.EULER,
+    'Midpoint': SOLVER.MIDPOINT,
+    'Verlet': SOLVER.VERLET,
   });
   gui.open();
   document.getElementsByClassName('close-bottom')[0].onclick = function() {

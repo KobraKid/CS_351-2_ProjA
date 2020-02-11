@@ -50,9 +50,7 @@ const STATE_SIZE = 16;
 const SOLVER = {
   EULER: 0,
   MIDPOINT: 1,
-  RUNGA_KUTTA: 2,
-  ITER_BACK: 3,
-  VERLET: 4,
+  VERLET: 2,
 };
 
 /**
@@ -244,8 +242,8 @@ class PartSys {
           this.s2[i] = this.s1[i] + this.sMdot[i] * (tracker.ms * 0.001);
         }
         break;
-      case SOLVER.ITER_BACK:
-
+      case SOLVER.VERLET:
+        // TODO
         break;
       default:
         console.log('unknown solver: ' + solver_type);

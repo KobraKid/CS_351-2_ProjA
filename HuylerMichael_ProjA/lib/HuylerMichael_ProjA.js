@@ -89,6 +89,9 @@ function main() {
   initParticleSystems();
   initVBOBoxes();
   vfield.constraint_set[0].draw(vfield._c_vbo, true, 1, 1, 1);
+  vfield.constraint_set[1].draw(vfield._c_vbo, true, 0, 1, 0);
+  vfield.constraint_set[2].draw(vfield._c_vbo, true, 0, 0, 1);
+  vfield.constraint_set[3].draw(vfield._c_vbo, true, 1, 0, 1);
   boid.constraint_set[0].draw(boid._c_vbo, true, 1, 1, 1);
   boid.constraint_set[1].draw(boid._c_vbo, true, 1, 0.1, 0.1);
   fire.constraint_set[0].draw(fire._c_vbo, true, 1, 1, 1);
@@ -590,7 +593,7 @@ function initParticleSystems() {
       // Color
       Math.random() * 0.1 + 0.9, Math.random() * 0.1 + 0.9, Math.random() * 0.1 + 0.9, 0.75,
       // Mass
-      0.1,
+      0.5,
       // Radius
       Math.random() * 4,
       // Age
@@ -605,10 +608,15 @@ function initParticleSystems() {
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // attractor
-      new Force(FORCE_TYPE.FORCE_LINE_ATTRACTOR, particles).init_attractor(/* pos */ 1, 3.5, 1.5, /* a */ 1, 0, 0, /* p, L */ 2, 2),
+      new Force(FORCE_TYPE.FORCE_LINE_ATTRACTOR, particles).init_attractor(/* pos */ 1, 3.5, 0.25, /* a */ 1, 0, 0, /* p, L */ -0.1, 1.75),
+      new Force(FORCE_TYPE.FORCE_LINE_ATTRACTOR, particles).init_attractor(/* pos */ 5, 3.5, 0.25, /* a */ -1, 0, 0, /* p, L */ 1, 1.75),
+      new Force(FORCE_TYPE.FORCE_LINE_ATTRACTOR, particles).init_attractor(/* pos */ 3, 3.5, 3, /* a */ 0, 0, -1, /* p, L */ 1, 1.5),
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, 0.1, 1, 5, 2, 5, 0, 3),
+      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.ALL, 1, 1, 2.75, 3.495, 3.505, 0.245, 0.255),
+      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.ALL, 1, 3.25, 5, 3.495, 3.505, 0.245, 0.255),
+      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.ALL, 1, 2.995, 3.005, 3.495, 3.505, 1.5, 3),
     ],
     new Float32Array(initial_conditions)
   );
