@@ -17,6 +17,7 @@ const FORCE_TYPE = {
   FORCE_FLOCK: 4,
   FORCE_PLANETARY_GRAVITY: 5,
   FORCE_LINE_ATTRACTOR: 6,
+  FORCE_VORTEX: 7,
 };
 
 // How long the force should stay active
@@ -134,11 +135,12 @@ class Force {
   /**
    * Initializes an attractor force.
    */
-  init_attractor(x, y, z, a_x, a_y, a_z, p, L = 0) {
+  init_attractor(x, y, z, a_x, a_y, a_z, p, L = 0, r = 0) {
     this._x_a = glMatrix.vec3.fromValues(x, y, z);
     this._a = glMatrix.vec3.fromValues(a_x, a_y, a_z);
     this._pow = p;
     this._L = L;
+    this._r = r;
     return this;
   }
 
@@ -201,7 +203,7 @@ class Force {
         // Dampen the forces
         // Multiply damping coeff. by difference in velocities of particles and
         // by the square of the normalized L vector
-        // TODO Figure out why this skews to the +y direction
+        // TODO Wrong implementation: currently dampens the entire velocity vector, not the relative velocity between two particles
         // Fx += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_X] - s[(this._p[1] * STATE_SIZE) + STATE.V_X] * Math.pow(Lx / distance, 2);
         // Fy += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Y] - s[(this._p[1] * STATE_SIZE) + STATE.V_Y] * Math.pow(Ly / distance, 2);
         // Fz += -1 * this._d * s[(this._p[0] * STATE_SIZE) + STATE.V_Z] - s[(this._p[1] * STATE_SIZE) + STATE.V_Z] * Math.pow(Lz / distance, 2);
@@ -280,9 +282,6 @@ class Force {
             // a_ij^c = k_c * x_ij
             glMatrix.vec3.add(a_i, a_i,
               glMatrix.vec3.scale(x_ij, x_ij, k_t * k_d * this._kc));
-            if (Number.isNaN(a_i[0])) {
-              console.log(x_i, x_j, x_ij, d_ij, t_ij, k_d, k_t, x_hat)
-            }
           }
           s[(this._p[i] * STATE_SIZE) + STATE.F_X] += a_i[0];
           s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += a_i[1];
@@ -290,14 +289,23 @@ class Force {
         }
         break;
       case FORCE_TYPE.FORCE_LINE_ATTRACTOR:
+        // attractor position
         const x_a = this._x_a;
+        // unit vector direction of x_a
         const a = this._a;
+        // current particle position
         var x_i = glMatrix.vec3.create();
+        // vector from x_a to x_i
         var x_ai = glMatrix.vec3.create();
+        // length of x_ai in the direction of a
         var l_ai = 0;
+        // vector to x_i orthogonal to a
         var r_ai = glMatrix.vec3.create();
-        var r = 0; // magnitude of r_ai
+        // magnitude of r_ai
+        var r = 0;
+        // additive accelerator operator
         var a_ai = glMatrix.vec3.create();
+        // closest distance to the line attractor an affected particle can be
         var epsilon = 0.01;
         for (var i = 0; i < this._p.length; i++) {
           x_i = glMatrix.vec3.fromValues(
@@ -314,6 +322,55 @@ class Force {
             s[(this._p[i] * STATE_SIZE) + STATE.F_X] += a_ai[0];
             s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += a_ai[1];
             s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += a_ai[2];
+          }
+        }
+        break;
+      case FORCE_TYPE.FORCE_VORTEX:
+        // vortex position
+        const x_v = this._x_a;
+        // unit vector direction of x_v
+        const v = this._a;
+        // current point position
+        var x_i = glMatrix.vec3.create();
+        // vector from x_v to x_i
+        var x_vi = glMatrix.vec3.create();
+        // length of x_vi in the direction of v
+        var l_vi = 0;
+        // vector to x_i orthogonal to v
+        var r_i = glMatrix.vec3.create();
+        // magnitude of r_i
+        var r = 0;
+        // closest distance to the vortex axis an affected particle can be
+        var epsilon = 0.01;
+        // rotational frequency at the edge of the vortex
+        const f_R = 1;
+        // maximum rotational frequency
+        const f_max = 4;
+        // rotational frequency of x_i at distance r from the vortex-s axis
+        var f_i = 0;
+        // angular velocity
+        var ω = 0;
+        // additive velocity operator
+        var v_vi = glMatrix.vec3.create();
+        for (var i = 0; i < this._p.length; i++) {
+          x_i = glMatrix.vec3.fromValues(
+            s[(this._p[i] * STATE_SIZE) + STATE.P_X],
+            s[(this._p[i] * STATE_SIZE) + STATE.P_Y],
+            s[(this._p[i] * STATE_SIZE) + STATE.P_Z]
+          );
+          x_vi = glMatrix.vec3.sub(x_vi, x_i, x_v);
+          l_vi = glMatrix.vec3.dot(v, x_vi);
+          if (epsilon <= l_vi && l_vi < this._L) {
+            r_i = glMatrix.vec3.scaleAndAdd(r_i, x_vi, v, -l_vi);
+            r = glMatrix.vec3.len(r_i);
+            if (r < this._r) {
+              f_i = Math.min(f_max, Math.pow(this._r / r, this._pow) * f_R);
+              ω = 2 * Math.PI * f_i;
+              v_vi = glMatrix.vec3.rotateZ(v_vi, x_i, x_v, ω);
+              s[(this._p[i] * STATE_SIZE) + STATE.V_X] += v_vi[0] - x_i[0];
+              s[(this._p[i] * STATE_SIZE) + STATE.V_Y] += v_vi[1] - x_i[1];
+              s[(this._p[i] * STATE_SIZE) + STATE.V_Z] += v_vi[2] - x_i[2];
+            }
           }
         }
         break;

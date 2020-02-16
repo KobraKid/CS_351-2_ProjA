@@ -50,7 +50,9 @@ const STATE_SIZE = 16;
 const SOLVER = {
   EULER: 0,
   MIDPOINT: 1,
-  VERLET: 2,
+  QUADRATIC_MIDPOINT_INVERSE: 2,
+  ADAMS_BASHFORTH: 3,
+  VERLET: 4,
 };
 
 /**
@@ -76,10 +78,15 @@ class PartSys {
       this._s1[i + STATE.B] = Math.random();
       this._s1[i + STATE.A] = 1;
     }
+    this._s0 = this._s1.slice();
+    this._s0dot = this._s1.slice();
     this._s1dot = this._s1.slice();
     this._s2 = this._s1.slice();
+    this._s2dot = this._s1.slice();
     this._sM = this._s1.slice();
     this._sMdot = this._s1.slice();
+    this._s3 = this._s1.slice();
+    this._sErr = this._s1.slice();
     this._force_set = [];
     this._constraint_set = [];
   }
@@ -96,11 +103,26 @@ class PartSys {
   get s2() {
     return this._s2;
   }
+  get s2dot() {
+    return this._s2dot;
+  }
   get sM() {
     return this._sM;
   }
   get sMdot() {
     return this._sMdot;
+  }
+  get s3() {
+    return this._s3;
+  }
+  get sErr() {
+    return this._sErr;
+  }
+  get s0() {
+    return this._s0;
+  }
+  get s0dot() {
+    return this._s0dot;
   }
   get force_set() {
     return this._force_set;
@@ -118,11 +140,26 @@ class PartSys {
   set s2(s) {
     this._s2 = s;
   }
+  set s2dot(s) {
+    this._s2dot = s;
+  }
   set sM(s) {
     this._sM = s;
   }
   set sMdot(s) {
     this._sMdot = s;
+  }
+  set s3(s) {
+    this._s3 = s;
+  }
+  set sErr(s) {
+    this._sErr = s;
+  }
+  set s0(s) {
+    this._s0 = s;
+  }
+  set s0dot(s) {
+    this._s0dot = s;
   }
   set force_set(f) {
     if (f instanceof Force) {
@@ -229,18 +266,49 @@ class PartSys {
   solver(solver_type) {
     switch (solver_type) {
       case SOLVER.EULER:
-        for (var i = 0; i < this.s2.length; i++) {
+        this.s2.map((v, i) => {
           this.s2[i] = this.s1[i] + this.s1dot[i] * (tracker.ms * 0.001);
-        }
+        });
         break;
       case SOLVER.MIDPOINT:
-        for (var i = 0; i < this.s2.length; i++) {
+        this.sM.map((v, i) => {
           this.sM[i] = this.s1[i] + this.s1dot[i] * (tracker.ms * 0.0005);
-        }
+        });
         this.sMdot = this.dotFinder(this.sM);
-        for (var i = 0; i < this.s2.length; i++) {
+        this.s2.map((v, i) => {
           this.s2[i] = this.s1[i] + this.sMdot[i] * (tracker.ms * 0.001);
-        }
+        });
+        break;
+      case SOLVER.QUADRATIC_MIDPOINT_INVERSE:
+        // Forward
+        this.sM.map((v, i) => {
+          this.sM[i] = this.s1[i] + this.s1dot[i] * (tracker.ms * 0.0005);
+        });
+        this.sMdot = this.dotFinder(this.sM);
+        this.s2.map((v, i) => {
+          this.s2[i] = this.s1[i] + this.sMdot[i] * (tracker.ms * 0.001);
+        });
+        // Backward
+        this.s2dot = this.dotFinder(this.s2);
+        this.sM.map((v, i) => {
+          this.sM[i] = this.s2[i] - this.s2dot[i] * (tracker.ms * 0.0005);
+        });
+        this.sMdot = this.dotFinder(this.sM);
+        this.s3.map((v, i) => {
+          this.s3[i] = this.s2[i] - this.sMdot[i] * (tracker.ms * 0.001);
+        });
+        this.sErr.map((v, i) => {
+          this.sErr[i] = this.s3[i] - this.s1[i];
+        });
+        this.s2.map((v, i) => {
+          this.s2[i] -= this.sErr[i] * 0.5;
+        });
+        break;
+      case SOLVER.ADAMS_BASHFORTH:
+        this.s0dot = this.dotFinder(this.s0);
+        this.s2.map((v, i) => {
+          this.s2[i] = this.s1[i] + this.s1dot[i] * (tracker.ms * 0.0015) - this.s0dot[i] * (tracker.ms * 0.0005);
+        });
         break;
       case SOLVER.VERLET:
         // TODO
@@ -258,9 +326,9 @@ class PartSys {
           // Reset age
           this.s2[(i * STATE_SIZE) + STATE.AGE] = 300;
           // Make it fall again
-          this.s2[(i * STATE_SIZE) + STATE.P_X] = Math.random() * 4 + 1;
-          this.s2[(i * STATE_SIZE) + STATE.P_Y] = Math.random() * 3 + 2;
-          this.s2[(i * STATE_SIZE) + STATE.P_Z] = 3;
+          this.s2[(i * STATE_SIZE) + STATE.P_X] = Math.random() * top_m[0] + top_a[0];
+          this.s2[(i * STATE_SIZE) + STATE.P_Y] = Math.random() * top_m[1] + top_a[1];
+          this.s2[(i * STATE_SIZE) + STATE.P_Z] = Math.random() * top_m[2] + top_a[2];
           this.s2[(i * STATE_SIZE) + STATE.V_X] = 0;
           this.s2[(i * STATE_SIZE) + STATE.V_Y] = 0;
           this.s2[(i * STATE_SIZE) + STATE.V_Z] = 0;
@@ -339,8 +407,9 @@ class PartSys {
    * @param {?Float32Array} s1 The previous state vector.
    * @param {?Float32Array} s2 The current state vector.
    */
-  swap(s1, s2) {
-    s1.set(s2);
+  swap() {
+    this.s0.set(this.s1);
+    this.s1.set(this.s2);
   }
 
   /**

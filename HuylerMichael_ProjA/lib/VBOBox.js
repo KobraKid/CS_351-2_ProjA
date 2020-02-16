@@ -6,9 +6,9 @@
 
 /* Camera variables */
 // where the camera is
-var g_perspective_eye = [6, 0, 1];
+var g_perspective_eye = [16, 0, 1];
 // where the camera is pointing
-var g_perspective_lookat = [5, 0, 1];
+var g_perspective_lookat = [15, 0, 1];
 // the camera's up axis
 var g_perspective_up = [0, 0, 1];
 // rotation step

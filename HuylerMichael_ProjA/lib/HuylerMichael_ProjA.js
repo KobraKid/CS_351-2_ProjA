@@ -17,7 +17,7 @@ var aspect;
 /* VBO Boxes */
 // Ground plane
 var vbo_0;
-// ???
+// Velocity field (snow)
 var vbo_1;
 // Boids
 var vbo_2;
@@ -38,11 +38,13 @@ var INIT_VEL = 0.15 * 60.0;
 // Vector Field
 const VEC_FIELD_PARTICLE_COUNT = 300;
 const vfield = new PartSys(VEC_FIELD_PARTICLE_COUNT);
+const top_m = [10, 10, 1];
+const top_a = [1, 2, 9];
 // Boids
 const BOID_PARTICLE_COUNT = 40;
 const boid = new PartSys(BOID_PARTICLE_COUNT);
 // Reve's Fire
-const FIRE_PARTICLE_COUNT = 500;
+const FIRE_PARTICLE_COUNT = 2000;
 const fire = new PartSys(FIRE_PARTICLE_COUNT);
 // Springs
 const CLOTH_WIDTH = 30;
@@ -69,7 +71,6 @@ function main() {
   }
 
   gl.clearColor(0.2, 0.2, 0.2, 1);
-  gl.disable(gl.DEPTH_TEST);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -90,8 +91,6 @@ function main() {
   initVBOBoxes();
   vfield.constraint_set[0].draw(vfield._c_vbo, true, 1, 1, 1);
   vfield.constraint_set[1].draw(vfield._c_vbo, true, 0, 1, 0);
-  vfield.constraint_set[2].draw(vfield._c_vbo, true, 0, 0, 1);
-  vfield.constraint_set[3].draw(vfield._c_vbo, true, 1, 0, 1);
   boid.constraint_set[0].draw(boid._c_vbo, true, 1, 1, 1);
   boid.constraint_set[1].draw(boid._c_vbo, true, 1, 0.1, 0.1);
   fire.constraint_set[0].draw(fire._c_vbo, true, 1, 1, 1);
@@ -203,7 +202,7 @@ function initVBOBoxes() {
       ['a_color_' + id]: [4, 3],
     },
     id,
-    () => {});
+    () => gl.enable(gl.DEPTH_TEST));
   vbo_0.init();
   vbo_boxes.push(vbo_0);
 
@@ -260,6 +259,7 @@ function initVBOBoxes() {
     },
     id,
     () => {
+      gl.disable(gl.DEPTH_TEST);
       if (!tracker.pause) {
         vfield.applyAllForces(vfield.s1);
         vfield.s1dot = vfield.dotFinder(vfield.s1);
@@ -267,7 +267,7 @@ function initVBOBoxes() {
         vfield.doConstraints();
         gl.uniform1i(sprite_locations[snow_sprite_id], snow_sprite_id);
         vfield.render();
-        vfield.swap(vfield.s1, vfield.s2);
+        vfield.swap();
       }
     });
   vbo_1.init();
@@ -323,6 +323,7 @@ function initVBOBoxes() {
     },
     id,
     () => {
+      gl.disable(gl.DEPTH_TEST);
       if (!tracker.pause) {
         boid.applyAllForces(boid.s1);
         boid.s1dot = boid.dotFinder(boid.s1);
@@ -330,7 +331,7 @@ function initVBOBoxes() {
         boid.doConstraints();
         gl.uniform1i(sprite_locations[boid_sprite_id], boid_sprite_id);
         boid.render();
-        boid.swap(boid.s1, boid.s2);
+        boid.swap();
       }
     });
   vbo_2.init();
@@ -386,6 +387,7 @@ function initVBOBoxes() {
     },
     id,
     () => {
+      gl.disable(gl.DEPTH_TEST);
       if (!tracker.pause) {
         fire.applyAllForces(fire.s1);
         fire.s1dot = fire.dotFinder(fire.s1);
@@ -393,7 +395,7 @@ function initVBOBoxes() {
         fire.doConstraints();
         gl.uniform1i(sprite_locations[fire_sprite_id], fire_sprite_id);
         fire.render();
-        fire.swap(fire.s1, fire.s2);
+        fire.swap();
       }
     });
   vbo_3.init();
@@ -444,13 +446,14 @@ function initVBOBoxes() {
     },
     id,
     () => {
+      gl.enable(gl.DEPTH_TEST);
       if (!tracker.pause) {
         spring.applyAllForces(spring.s1);
         spring.s1dot = spring.dotFinder(spring.s1);
         spring.solver(Number(tracker.solver));
         spring.doConstraints();
         spring.render();
-        spring.swap(spring.s1, spring.s2);
+        spring.swap();
       }
     });
   vbo_4.init();
@@ -500,7 +503,7 @@ function initVBOBoxes() {
       ['a_enabled_' + id]: [6, 1],
     },
     id,
-    () => {});
+    () => gl.enable(gl.DEPTH_TEST));
   vbo_5.init();
   vbo_boxes.push(vbo_5);
 
@@ -550,6 +553,7 @@ function initVBOBoxes() {
     },
     id,
     () => {
+      gl.enable(gl.DEPTH_TEST);
       var p = 0;
       for (var i = 0; i < spring.force_set.length; i++) {
         if (spring.force_set[i].type == FORCE_TYPE.FORCE_SPRING) {
@@ -585,7 +589,7 @@ function initParticleSystems() {
   for (var i = 0; i < VEC_FIELD_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
     [].push.apply(initial_conditions, [
       // Position
-      Math.random() * 4 + 1, Math.random() * 3 + 2, Math.random() * 3,
+      Math.random() * top_m[0] + top_a[0], Math.random() * top_m[1] + top_a[1], Math.random() * top_m[2] + top_a[2],
       // Velocity
       0, 0, 0,
       // Force
@@ -608,15 +612,11 @@ function initParticleSystems() {
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // attractor
-      new Force(FORCE_TYPE.FORCE_LINE_ATTRACTOR, particles).init_attractor(/* pos */ 1, 3.5, 0.25, /* a */ 1, 0, 0, /* p, L */ -0.1, 1.75),
-      new Force(FORCE_TYPE.FORCE_LINE_ATTRACTOR, particles).init_attractor(/* pos */ 5, 3.5, 0.25, /* a */ -1, 0, 0, /* p, L */ 1, 1.75),
-      new Force(FORCE_TYPE.FORCE_LINE_ATTRACTOR, particles).init_attractor(/* pos */ 3, 3.5, 3, /* a */ 0, 0, -1, /* p, L */ 1, 1.5),
+      new Force(FORCE_TYPE.FORCE_VORTEX, particles).init_attractor( /* pos */ 6, 7, 0, /* a */ 0, 0, 1, /* τ, L, r */ 2, 10, 6),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, 0.1, 1, 5, 2, 5, 0, 3),
-      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.ALL, 1, 1, 2.75, 3.495, 3.505, 0.245, 0.255),
-      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.ALL, 1, 3.25, 5, 3.495, 3.505, 0.245, 0.255),
-      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.ALL, 1, 2.995, 3.005, 3.495, 3.505, 1.5, 3),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, 0.1, 1, 11, 2, 12, 0, 10),
+      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.ALL, 1, 6, 6.001, 7, 7.001, 0, 10),
     ],
     new Float32Array(initial_conditions)
   );
@@ -650,7 +650,7 @@ function initParticleSystems() {
       // air drag
       // new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // wind
-      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 1, 1, 0),
+      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(0.4, 1, 1, 0),
       // boids
       new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(0.5, 1, (2 * Math.PI) * (1 / 4), (2 * Math.PI) * (1 / 2), 0.1, 0.1, 0.1),
     ],
@@ -686,6 +686,8 @@ function initParticleSystems() {
   fire.init(PARTICLE_SYSTEM.REEVES_FIRE,
     3, 5,
     [
+      // TODO gravity
+      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // Fountain effect

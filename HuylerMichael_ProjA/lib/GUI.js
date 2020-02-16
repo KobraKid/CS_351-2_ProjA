@@ -62,7 +62,9 @@ function initGui() {
   globals.add(tracker, 'restitution');
   globals.add(tracker, 'solver', {
     'Euler': SOLVER.EULER,
-    'Midpoint': SOLVER.MIDPOINT,
+    'Adams-Bashforth': SOLVER.ADAMS_BASHFORTH,
+    '(Explicit) Midpoint': SOLVER.MIDPOINT,
+    '(Implicit) Midpoint': SOLVER.QUADRATIC_MIDPOINT_INVERSE,
     'Verlet': SOLVER.VERLET,
   });
   gui.open();
