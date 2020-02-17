@@ -98,6 +98,8 @@ function main() {
   spring.constraint_set[0].draw(spring._c_vbo, true, 1, 1, 1);
   spring.constraint_set[1].draw(spring._c_vbo, true, 1, 1, 1);
   spring.constraint_set[2].draw(spring._c_vbo, true, 1, 1, 1);
+  spring.constraint_set[3].draw(spring._c_vbo, true, 1, 1, 1);
+  spring.constraint_set[4].draw(spring._c_vbo, true, 1, 1, 1);
 
   // There is a significant overhead inherent in setting up the VBOs and
   // particle systems, so we start our timing after the setup has completed
@@ -772,9 +774,11 @@ function initParticleSystems() {
       ...cloth_f,
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL ^ WALL.BOTTOM, tracker.restitution, -2, 1, 0, 2, 0, 1.975),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL /* ^ WALL.BOTTOM */, tracker.restitution, -1, 1, 0, 2, 0, 1.975),
       new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, -0.1, 0.65, 1, 0.5),
       new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, 0.1, 1.5, 1.3, 0.25),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, 0.5, 0.75, 0, 0.375),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, -0.125, 1.25, -0.125, 0.5),
       ...cloth_c,
     ],
     new Float32Array(initial_conditions)

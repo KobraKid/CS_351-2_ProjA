@@ -60,15 +60,15 @@ const SOLVER = {
  */
 class PartSys {
   /**
-   * @param {number} FIRE_PARTICLE_COUNT The number of particles to initialize.
+   * @param {number} PARTICLE_COUNT The number of particles to initialize.
    */
-  constructor(FIRE_PARTICLE_COUNT) {
+  constructor(PARTICLE_COUNT) {
     this._type = -1;
-    this._FIRE_PARTICLE_COUNT = FIRE_PARTICLE_COUNT;
+    this._PARTICLE_COUNT = PARTICLE_COUNT;
     this._vbo = null;
     this._c_vbo = -1;
-    this._s1 = new Float32Array(FIRE_PARTICLE_COUNT * STATE_SIZE);
-    for (var i = 0; i < FIRE_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
+    this._s1 = new Float32Array(PARTICLE_COUNT * STATE_SIZE);
+    for (var i = 0; i < PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
       this._s1[i + STATE.P_X] = Math.random() * 2 - 1;
       this._s1[i + STATE.P_Y] = Math.random() * 2 - 1;
       this._s1[i + STATE.P_Z] = Math.random() * 2;
@@ -413,16 +413,6 @@ class PartSys {
   }
 
   /**
-   * Adds a new force to the particle system, or replaces the set of forces
-   * with a new set if an array is passed in.
-   *
-   * @param {?Force} f The force to be added to this particle system.
-   */
-  addForce(f) {
-    this.force_set = f;
-  }
-
-  /**
    * Enables a force.
    *
    * @param {number} i The index of the force to be enabled.
@@ -438,16 +428,6 @@ class PartSys {
    */
   disableForce(i) {
     this.force_set[i].disable();
-  }
-
-  /**
-   * Adds a new constraint to the particle system, or replaces the set of
-   * constraints with a new set if an array is passed in.
-   *
-   * @param {?Constraint} c The constraint to be added to this particle system.
-   */
-  addConstraint(c) {
-    this.constraint_set.push(c);
   }
 
   /**
@@ -476,7 +456,7 @@ class PartSys {
    * @return {string} This particle system's text representation.
    */
   toString() {
-    var partSysString = "" + this._FIRE_PARTICLE_COUNT;
+    var partSysString = "" + this._PARTICLE_COUNT;
     for (var constraint in this.constraint_set) {
       partSysString += constraint.toString();
     }

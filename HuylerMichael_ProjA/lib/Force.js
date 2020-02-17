@@ -31,7 +31,6 @@ class Force {
   /**
    * @param {!FORCE_TYPE} type The type of force to implement.
    * @param {Array<number>} affected_particles The list of affected particles.
-   * @param {number} timeout How long the force should last.
    */
   constructor(type, affected_particles) {
     this._type = type;
@@ -381,11 +380,11 @@ class Force {
   }
 
   /**
-   * Toggles drawing of this constraint, and updates vertices when bounds change.
+   * Toggles drawing of this force, and updates vertices when it changes.
    *
    * @param {!VBOBox} vbo The VBO to update.
-   * @param {number} index The index of this constraint.
-   * @param {boolean} enabled Whether this constraint should be drawn.
+   * @param {number} index The index of this force.
+   * @param {boolean} enabled Whether this force should be drawn.
    */
   draw(vbo, index, enabled, p0, p1) {
     var r = Math.random();

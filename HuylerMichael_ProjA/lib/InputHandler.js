@@ -10,6 +10,7 @@
 var keysPressed = {};
 var keyPollingFrequency = 3; // Frames between key polling
 var shouldUpdateKeypress = 0;
+var clothState = false; // true: reset, false: released
 
 /**
  * Performs an action when a key is pressed.
@@ -80,19 +81,31 @@ function keyUp(kev) {
       break;
     case "Space":
     case "32":
-      var vertical_cloth = [];
-      for (var i = 0; i < SPRING_PARTICLE_COUNT; i++) {
-        [].push.apply(vertical_cloth, [
-          (i / CLOTH_WIDTH) * 0.05, 0.25 + (i % CLOTH_WIDTH) * 0.05, 1.95 + Math.cos(i / CLOTH_WIDTH) * 0.15,
-          0, 0, 0,
-          0, 0, 0,
-          1, 1, 1, 1,
-          0.5,
-          1,
-          0
-        ]);
+      clothState = !clothState;
+      if (clothState) {
+        var vertical_cloth = [];
+        for (var i = 0; i < SPRING_PARTICLE_COUNT; i++) {
+          [].push.apply(vertical_cloth, [
+            (i / CLOTH_WIDTH) * 0.05, 0.25 + (i % CLOTH_WIDTH) * 0.05, 1.95 + Math.cos(i / CLOTH_WIDTH) * 0.15,
+            0, 0, 0,
+            0, 0, 0,
+            1, 1, 1, 1,
+            0.5,
+            1,
+            0
+          ]);
+        }
+        spring.blink(new Float32Array(vertical_cloth));
+        for (var i = 0; i < spring.constraint_set.length; i++) {
+          if (spring.constraint_set[i].type == CONSTRAINT_TYPE.ABSOLUTE)
+            spring.constraint_set[i].enable();
+        }
+      } else {
+        for (var i = 0; i < spring.constraint_set.length; i++) {
+          if (spring.constraint_set[i].type == CONSTRAINT_TYPE.ABSOLUTE)
+            spring.constraint_set[i].disable();
+        }
       }
-      spring.blink(new Float32Array(vertical_cloth));
       break;
     default:
       // console.log("Unused key: " + code);
