@@ -476,6 +476,26 @@ class PartSys {
       partSysFolder.add(tracker, hash + "_radius").name("Boid Radius").onChange(function(value) {
         this._boid_radius = Math.max(value, 0);
       }.bind(this));
+      tracker[hash + "_ka"]  = this.force_set[0]._ka;
+      partSysFolder.add(tracker, hash + "_ka", 0.1, 1, 0.1).name("k<sub>a</sub>").onChange(function(value) {
+        this.force_set[0]._ka = value;
+      }.bind(this));
+      tracker[hash + "_kv"]  = this.force_set[0]._kv;
+      partSysFolder.add(tracker, hash + "_kv", 0.1, 1, 0.1).name("k<sub>v</sub>").onChange(function(value) {
+        this.force_set[0]._kv = value;
+      }.bind(this));
+      tracker[hash + "_kc"]  = this.force_set[0]._kc;
+      partSysFolder.add(tracker, hash + "_kc", 0.1, 1, 0.1).name("k<sub>c</sub>").onChange(function(value) {
+        this.force_set[0]._kc = value;
+      }.bind(this));
+      tracker[hash + "_koa"]  = this.force_set[0]._koa;
+      partSysFolder.add(tracker, hash + "_koa", 0.1, 1, 0.1).name("k<sub>oa</sub>").onChange(function(value) {
+        this.force_set[0]._koa = value;
+      }.bind(this));
+      tracker[hash + "_kgs"]  = this.force_set[0]._kgs;
+      partSysFolder.add(tracker, hash + "_kgs", 0.1, 1, 0.1).name("k<sub>gs</sub>").onChange(function(value) {
+        this.force_set[0]._kgs = value;
+      }.bind(this));
     }
 
     // Add a master toggle to hide all of this particle system's constraints

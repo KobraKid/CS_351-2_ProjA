@@ -63,7 +63,7 @@ class Constraint {
    * @param {!WALL=} enabled_walls The walls to enable for this constraint.
    * @param {...number} bounds The rest of the arguments are all numbers which bound the constraint.
    */
-  constructor(type, affected_particles, enabled_walls = WALL.NONE, restitution, ...bounds) {
+  constructor(type, affected_particles, color, enabled_walls = WALL.NONE, restitution, ...bounds) {
     this._type = type;
     this._index = -1;
     switch (this._type) {
@@ -96,6 +96,7 @@ class Constraint {
         break;
     }
     this._p = affected_particles;
+    this._color = color;
     this._walls = enabled_walls;
     this._restitution = restitution;
     this._enabled = true;
@@ -178,6 +179,9 @@ class Constraint {
   }
   set restitution(r) {
     this._restitution = r;
+  }
+  set color(color) {
+    this._color = glMatrix.vec3.clone(color);
   }
 
   /**
@@ -447,7 +451,7 @@ class Constraint {
    * @param {!VBOBox} vbo The VBO to update.
    * @param {boolean} enabled Whether this constraint should be drawn.
    */
-  draw(vbo, visible, r, g, b) {
+  draw(vbo, visible) {
     visible = visible && this._enabled;
     switch (this._type) {
       case CONSTRAINT_TYPE.VOLUME_IMPULSIVE:
@@ -456,41 +460,41 @@ class Constraint {
       case CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE:
         vbo_boxes[vbo].reload(
           new Float32Array([
-            this._x_min, this._y_min, this._z_min, r, g, b, visible | 0, // 1
-            this._x_min, this._y_max, this._z_min, r, g, b, visible | 0, // 2
+            this._x_min, this._y_min, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.BACK) > 0 || (this._walls & WALL.BOTTOM) > 0) | 0, // 1
+            this._x_min, this._y_max, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.BACK) > 0 || (this._walls & WALL.BOTTOM) > 0) | 0, // 2
 
-            this._x_min, this._y_max, this._z_min, r, g, b, visible | 0, // 2
-            this._x_max, this._y_max, this._z_min, r, g, b, visible | 0, // 3
+            this._x_min, this._y_max, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.RIGHT) > 0 || (this._walls & WALL.BOTTOM) > 0) | 0, // 2
+            this._x_max, this._y_max, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.RIGHT) > 0 || (this._walls & WALL.BOTTOM) > 0) | 0, // 3
 
-            this._x_max, this._y_max, this._z_min, r, g, b, visible | 0, // 3
-            this._x_max, this._y_min, this._z_min, r, g, b, visible | 0, // 4
+            this._x_max, this._y_max, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.FRONT) > 0 || (this._walls & WALL.BOTTOM) > 0) | 0, // 3
+            this._x_max, this._y_min, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.FRONT) > 0 || (this._walls & WALL.BOTTOM) > 0) | 0, // 4
 
-            this._x_max, this._y_min, this._z_min, r, g, b, visible | 0, // 4
-            this._x_min, this._y_min, this._z_min, r, g, b, visible | 0, // 1
+            this._x_max, this._y_min, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.LEFT) > 0 || (this._walls & WALL.BOTTOM) > 0) | 0, // 4
+            this._x_min, this._y_min, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.LEFT) > 0 || (this._walls & WALL.BOTTOM) > 0) | 0, // 1
 
-            this._x_max, this._y_min, this._z_max, r, g, b, visible | 0, // 5
-            this._x_max, this._y_max, this._z_max, r, g, b, visible | 0, // 6
+            this._x_max, this._y_min, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.FRONT) > 0 || (this._walls & WALL.TOP) > 0) | 0, // 5
+            this._x_max, this._y_max, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.FRONT) > 0 || (this._walls & WALL.TOP) > 0) | 0, // 6
 
-            this._x_max, this._y_max, this._z_max, r, g, b, visible | 0, // 6
-            this._x_min, this._y_max, this._z_max, r, g, b, visible | 0, // 7
+            this._x_max, this._y_max, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.RIGHT) > 0 || (this._walls & WALL.TOP) > 0) | 0, // 6
+            this._x_min, this._y_max, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.RIGHT) > 0 || (this._walls & WALL.TOP) > 0) | 0, // 7
 
-            this._x_min, this._y_max, this._z_max, r, g, b, visible | 0, // 7
-            this._x_min, this._y_min, this._z_max, r, g, b, visible | 0, // 8
+            this._x_min, this._y_max, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.BACK) > 0 || (this._walls & WALL.TOP) > 0) | 0, // 7
+            this._x_min, this._y_min, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.BACK) > 0 || (this._walls & WALL.TOP) > 0) | 0, // 8
 
-            this._x_min, this._y_min, this._z_max, r, g, b, visible | 0, // 8
-            this._x_max, this._y_min, this._z_max, r, g, b, visible | 0, // 5
+            this._x_min, this._y_min, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.LEFT) > 0 || (this._walls & WALL.TOP) > 0) | 0, // 8
+            this._x_max, this._y_min, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.LEFT) > 0 || (this._walls & WALL.TOP) > 0) | 0, // 5
 
-            this._x_min, this._y_min, this._z_min, r, g, b, visible | 0, // 1
-            this._x_min, this._y_min, this._z_max, r, g, b, visible | 0, // 8
+            this._x_min, this._y_min, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.LEFT) > 0 || (this._walls & WALL.BACK) > 0) | 0, // 1
+            this._x_min, this._y_min, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.LEFT) > 0 || (this._walls & WALL.BACK) > 0) | 0, // 8
 
-            this._x_min, this._y_max, this._z_min, r, g, b, visible | 0, // 2
-            this._x_min, this._y_max, this._z_max, r, g, b, visible | 0, // 7
+            this._x_min, this._y_max, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.RIGHT) > 0 || (this._walls & WALL.BACK) > 0) | 0, // 2
+            this._x_min, this._y_max, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.RIGHT) > 0 || (this._walls & WALL.BACK) > 0) | 0, // 7
 
-            this._x_max, this._y_max, this._z_min, r, g, b, visible | 0, // 3
-            this._x_max, this._y_max, this._z_max, r, g, b, visible | 0, // 6
+            this._x_max, this._y_max, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.RIGHT) > 0 || (this._walls & WALL.FRONT) > 0)  | 0, // 3
+            this._x_max, this._y_max, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.RIGHT) > 0 || (this._walls & WALL.FRONT) > 0)  | 0, // 6
 
-            this._x_max, this._y_min, this._z_min, r, g, b, visible | 0, // 4
-            this._x_max, this._y_min, this._z_max, r, g, b, visible | 0, // 5
+            this._x_max, this._y_min, this._z_min, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.LEFT) > 0 || (this._walls & WALL.FRONT) > 0) | 0, // 4
+            this._x_max, this._y_min, this._z_max, this._color[0], this._color[1], this._color[2], visible & ((this._walls & WALL.LEFT) > 0 || (this._walls & WALL.FRONT) > 0) | 0, // 5
           ]),
           this._index * 7 * 24);
         break;
@@ -499,65 +503,65 @@ class Constraint {
         var corner = Math.sqrt(2) / 2;
         vbo_boxes[vbo].reload(
           new Float32Array([
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, 0, -this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, 0, -this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, this._r * corner, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, this._r * corner, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r, 0, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(-this._r * corner, -this._r * corner, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r * corner, -this._r * corner, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(this._r, 0, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, this._r))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, -this._r * corner, -this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], this._color[0], this._color[1], this._color[2], visible | 0,
 
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], r, g, b, visible | 0,
-            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], r, g, b, visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, 0, -this._r))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r * corner, -this._r * corner))], this._color[0], this._color[1], this._color[2], visible | 0,
+            ...[...glMatrix.vec3.add(out, this._c, glMatrix.vec3.fromValues(0, this._r, 0))], this._color[0], this._color[1], this._color[2], visible | 0,
           ]),
           this._index * 7 * 24);
         break;

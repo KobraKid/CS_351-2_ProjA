@@ -18,6 +18,7 @@ const FORCE_TYPE = {
   FORCE_PLANETARY_GRAVITY: 5,
   FORCE_LINE_ATTRACTOR: 6,
   FORCE_VORTEX: 7,
+  FORCE_UNIFORM_POINT_ATTRACTOR: 8,
 };
 
 // How long the force should stay active
@@ -59,12 +60,21 @@ class Force {
 
   set x(new_x) {
     this._x = new_x;
+    if ("undefined" !== typeof(this._x_a)) {
+      this._x_a[0] = new_x;
+    }
   }
   set y(new_y) {
     this._y = new_y;
+    if ("undefined" !== typeof(this._x_a)) {
+      this._x_a[1] = new_y;
+    }
   }
   set z(new_z) {
     this._z = new_z;
+    if ("undefined" !== typeof(this._x_a)) {
+      this._x_a[2] = new_z;
+    }
   }
   set magnitude(new_mag) {
     this._magnitude = new_mag;
@@ -109,8 +119,8 @@ class Force {
    *  - Alignment
    *  - Cohesion
    *
-   * * there can be more forces applied to boids, such as obstacle avoidance,
-   * which is, in fact, used by this implementation.
+   * * there can be more forces applied to boids, such as obstacle avoidance
+   * and goal seeking, which are in fact used by this implementation.
    *
    * @param {number} min_rad The bois' small (focused) visual radius.
    * @param {number} max_rad The bois' large (boundary) visual radius.
@@ -120,7 +130,7 @@ class Force {
    * @param {number} k_v The velocity matching hyperparameter.
    * @param {number} k_c The centering hyperparameter.
    */
-  init_boid(min_rad, max_rad, binocular_angle, monocular_angle, k_a, k_v, k_c) {
+  init_boid(min_rad, max_rad, binocular_angle, monocular_angle, k_a, k_v, k_c, k_oa, k_gs) {
     this._r1 = min_rad;
     this._r2 = max_rad;
     this._t1 = binocular_angle; // θ1
@@ -128,6 +138,8 @@ class Force {
     this._ka = k_a;
     this._kv = k_v;
     this._kc = k_c;
+    this._koa = k_oa;
+    this._kgs = k_gs;
     return this;
   }
 
@@ -219,12 +231,30 @@ class Force {
         var x_i = glMatrix.vec3.create();
         // Our 'other' boid
         var x_j = glMatrix.vec3.create();
+        // The 'predator'
+        const x_p = glMatrix.vec3.fromValues(
+          s[(BOID_PARTICLE_COUNT - 1) * STATE_SIZE + STATE.P_X],
+          s[(BOID_PARTICLE_COUNT - 1) * STATE_SIZE + STATE.P_Y],
+          s[(BOID_PARTICLE_COUNT - 1) * STATE_SIZE + STATE.P_Z]);
+        // The 'goal'
+        const x_g = glMatrix.vec3.fromValues(
+          boid.force_set[3].x,
+          boid.force_set[3].y,
+          boid.force_set[3].z);
         // The vector from current to other
         var x_ij = glMatrix.vec3.create();
+        // The vector from current to predator
+        var x_ip = glMatrix.vec3.create();
+        // The vector from the current to the goal
+        var x_ig = glMatrix.vec3.create();
         // The directional vector from current to other
         var x_hat = glMatrix.vec3.create();
         // The distance from current to other
         var d_ij = 0;
+        // The distance from current to predator
+        var d_ip = 0;
+        // The distance from current to goal
+        var d_ig = 0;
         // The angle between current and other
         var t_ij = 0;
         // The accumulated acceleration
@@ -281,6 +311,21 @@ class Force {
             // a_ij^c = k_c * x_ij
             glMatrix.vec3.add(a_i, a_i,
               glMatrix.vec3.scale(x_ij, x_ij, k_t * k_d * this._kc));
+            /* Obstacle Avoidance */
+            // Hardcoded avoidance of particle [BOID_PARTICLE_COUNT - 1]
+            // a_ix^oa = -(k_oa / d_ip) * x_ip/d_ip
+            x_ip = glMatrix.vec3.sub(x_ip, x_p, x_i);
+            d_ip = glMatrix.vec3.length(x_ip);
+            glMatrix.vec3.add(a_i, a_i,
+              glMatrix.vec3.scale(x_ip, x_ip, (-1 * this._koa / d_ip) / d_ip));
+            /* Goal Seeking */
+            // Seeks the same goals as the predator's random walk, but will
+            // avoid getting too close to the predator
+            // a_ij^gs = k_gs * x_ig
+            x_ig = glMatrix.vec3.sub(x_ig, x_g, x_i);
+            d_ig = glMatrix.vec3.length(x_ig);
+            glMatrix.vec3.add(a_i, a_i,
+              glMatrix.vec3.scale(x_ig, x_ig, this._kgs / d_ig));
           }
           s[(this._p[i] * STATE_SIZE) + STATE.F_X] += a_i[0];
           s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += a_i[1];
@@ -371,6 +416,22 @@ class Force {
               s[(this._p[i] * STATE_SIZE) + STATE.V_Z] += v_vi[2] - x_i[2];
             }
           }
+        }
+        break;
+      case FORCE_TYPE.FORCE_UNIFORM_POINT_ATTRACTOR:
+        var dir = glMatrix.vec3.create();
+        for (var i = 0; i < this._p.length; i++) {
+          dir = glMatrix.vec3.sub(dir,
+            this._x_a,
+            glMatrix.vec3.fromValues(
+              s[(this._p[i] * STATE_SIZE) + STATE.P_X],
+              s[(this._p[i] * STATE_SIZE) + STATE.P_Y],
+              s[(this._p[i] * STATE_SIZE) + STATE.P_Z]
+            ));
+          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += dir[0];
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += dir[1];
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += dir[2];
+          // console.log(glMatrix.vec3.str(dir), glMatrix.vec3.str(this._x_a));
         }
         break;
       default:

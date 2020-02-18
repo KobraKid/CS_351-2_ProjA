@@ -41,8 +41,9 @@ const vfield = new PartSys(VEC_FIELD_PARTICLE_COUNT);
 const top_m = [10, 10, 1];
 const top_a = [1, 2, 9];
 // Boids
-const BOID_PARTICLE_COUNT = 40;
+const BOID_PARTICLE_COUNT = 90;
 const boid = new PartSys(BOID_PARTICLE_COUNT);
+var boid_predator_timer = 0;
 // Reve's Fire
 const FIRE_PARTICLE_COUNT = 2000;
 const fire = new PartSys(FIRE_PARTICLE_COUNT);
@@ -89,17 +90,10 @@ function main() {
   initGui();
   initParticleSystems();
   initVBOBoxes();
-  vfield.constraint_set[0].draw(vfield._c_vbo, true, 1, 1, 1);
-  vfield.constraint_set[1].draw(vfield._c_vbo, true, 0, 1, 0);
-  boid.constraint_set[0].draw(boid._c_vbo, true, 1, 1, 1);
-  boid.constraint_set[1].draw(boid._c_vbo, true, 1, 0.1, 0.1);
-  fire.constraint_set[0].draw(fire._c_vbo, true, 1, 1, 1);
-  fire.constraint_set[1].draw(fire._c_vbo, true, 1, 0.2, 0.2);
-  spring.constraint_set[0].draw(spring._c_vbo, true, 1, 1, 1);
-  spring.constraint_set[1].draw(spring._c_vbo, true, 1, 1, 1);
-  spring.constraint_set[2].draw(spring._c_vbo, true, 1, 1, 1);
-  spring.constraint_set[3].draw(spring._c_vbo, true, 1, 1, 1);
-  spring.constraint_set[4].draw(spring._c_vbo, true, 1, 1, 1);
+  vfield.constraint_set.forEach(constraint => constraint.draw(vfield._c_vbo, true));
+  boid.constraint_set.forEach(constraint => constraint.draw(vfield._c_vbo, true));
+  fire.constraint_set.forEach(constraint => constraint.draw(vfield._c_vbo, true));
+  spring.constraint_set.forEach(constraint => constraint.draw(vfield._c_vbo, true));
 
   // There is a significant overhead inherent in setting up the VBOs and
   // particle systems, so we start our timing after the setup has completed
@@ -110,6 +104,14 @@ function main() {
     updateKeypresses();
     requestAnimationFrame(tick, canvas);
     if (shouldUpdateFrame >= tracker.speed) {
+      boid_predator_timer -= 1;
+      if (boid_predator_timer <= 0) {
+        boid_predator_timer = 240;
+        // random walk
+        boid.force_set[3].x = Math.random() * Math.abs(boid.constraint_set[0].bounds[1] - boid.constraint_set[0].bounds[0]) + boid.constraint_set[0].bounds[0];
+        boid.force_set[3].y = Math.random() * Math.abs(boid.constraint_set[0].bounds[3] - boid.constraint_set[0].bounds[2]) + boid.constraint_set[0].bounds[2];
+        boid.force_set[3].z = Math.random() * Math.abs(boid.constraint_set[0].bounds[5] - boid.constraint_set[0].bounds[4]) + boid.constraint_set[0].bounds[4];
+      }
       tracker.fps_calc();
       drawAll();
       shouldUpdateFrame = 1;
@@ -617,19 +619,19 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_VORTEX, particles).init_attractor( /* pos */ 6, 7, 0, /* a */ 0, 0, 1, /* τ, L, r */ 2, 10, 6),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, 0.1, 1, 11, 2, 12, 0, 10),
-      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.ALL, 1, 6, 6.001, 7, 7.001, 0, 10),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(1, 1, 1), WALL.ALL, 0.1, 1, 11, 2, 12, 0, 10),
+      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(0, 1, 0), WALL.ALL, 1, 6, 6.001, 7, 7.001, 0, 10),
     ],
     new Float32Array(initial_conditions)
   );
 
   /* Particle System 2: Boids */
-  particles = [...Array(BOID_PARTICLE_COUNT).keys()];
+  particles = [...Array(BOID_PARTICLE_COUNT - 1).keys()];
   initial_conditions = [];
   for (var i = 0; i < BOID_PARTICLE_COUNT * STATE_SIZE; i += STATE_SIZE) {
     [].push.apply(initial_conditions, [
       // Position
-      Math.random() * 3 - 2, Math.random() * 5 - 3, Math.random() + 2,
+      Math.random() * 3 - 5, Math.random() * 5 - 3, Math.random() + 2,
       // Velocity
       Math.random() * 6 - 3, Math.random(), Math.random() * 6 - 3,
       // Force
@@ -644,22 +646,29 @@ function initParticleSystems() {
       0
     ]);
   }
+  initial_conditions[(BOID_PARTICLE_COUNT - 1) * STATE_SIZE + STATE.R] = 1;
+  initial_conditions[(BOID_PARTICLE_COUNT - 1) * STATE_SIZE + STATE.G] = 0.1;
+  initial_conditions[(BOID_PARTICLE_COUNT - 1) * STATE_SIZE + STATE.B] = 0.1;
   boid.init(PARTICLE_SYSTEM.BOIDS,
     2, 5,
     [
-      // gravity
-      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
-      // air drag
-      // new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
-      // wind
-      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(0.4, 1, 1, 0),
       // boids
-      new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(0.5, 1, (2 * Math.PI) * (1 / 4), (2 * Math.PI) * (1 / 2), 0.1, 0.1, 0.1),
+      new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(0.5, 1, (2 * Math.PI) * (1 / 4), (2 * Math.PI) * (1 / 2), 0.8, 0.1, 0.5, 0.1, 0.4),
+      // drag
+      new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
+      // wind
+      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 1, 1, 0),
+      // "predator" forces: point attractor, drag
+      new Force(FORCE_TYPE.FORCE_UNIFORM_POINT_ATTRACTOR, [BOID_PARTICLE_COUNT - 1]).init_attractor(0, 0, 0),
+      new Force(FORCE_TYPE.FORCE_DRAG, [BOID_PARTICLE_COUNT - 1]).init_vectored(tracker.drag),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.TOP | WALL.BOTTOM, tracker.restitution, -2, 1, -3, 2, 2.025, 3),
-      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, WALL.LEFT, tracker.restitution, -0.5, 0, -1, 0, 2.025, 3),
-      new Constraint(CONSTRAINT_TYPE.VOLUME_WRAP, particles, WALL.ALL ^ (WALL.TOP | WALL.BOTTOM), 0, -2, 1, -3, 2, 2.025, 3),
+      // Walls on top and bottom for boids
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(1, 1, 1), WALL.TOP | WALL.BOTTOM, tracker.restitution, -5, -2, -3, 2, 2.025, 3),
+      // Walls on all sides for predator
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, [BOID_PARTICLE_COUNT - 1], glMatrix.vec3.fromValues(1, 1, 0.1), WALL.ALL, tracker.restitution, -5, -2, -3, 2, 2.025, 3),
+      // Wraparound for boids
+      new Constraint(CONSTRAINT_TYPE.VOLUME_WRAP, particles, glMatrix.vec3.fromValues(1, 0.1, 0.1), WALL.ALL ^ (WALL.TOP | WALL.BOTTOM), 0, -5, -2, -3, 2, 2.025, 3),
     ],
     new Float32Array(initial_conditions)
   );
@@ -698,8 +707,8 @@ function initParticleSystems() {
       new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 0, 1, 0),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL, tracker.restitution, -2, 1, -3, -0.025, 0, 1.975),
-      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, 0, -0.5, -1.5, 1, 0.25),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(1, 1, 1), WALL.ALL, tracker.restitution, -2, 1, -3, -0.025, 0, 1.975),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, glMatrix.vec3.fromValues(1, 0.2, 0.2), 0, 0, -0.5, -1.5, 1, 0.25),
     ],
     new Float32Array(initial_conditions)
   );
@@ -733,7 +742,7 @@ function initParticleSystems() {
   for (var i = 0; i < CLOTH_WIDTH * CLOTH_HEIGHT; i++) {
     // Pin the top of the cloth
     if (i < CLOTH_WIDTH) {
-      cloth_c.push(new Constraint(CONSTRAINT_TYPE.ABSOLUTE, [i], undefined, tracker.restitution, 0, 0.25 + i * dist, 1.95));
+      cloth_c.push(new Constraint(CONSTRAINT_TYPE.ABSOLUTE, [i], glMatrix.vec3.create(), undefined, tracker.restitution, 0, 0.25 + i * dist, 1.95));
     }
     /* Structural Springs */
     // Horizontal
@@ -774,11 +783,11 @@ function initParticleSystems() {
       ...cloth_f,
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, WALL.ALL /* ^ WALL.BOTTOM */, tracker.restitution, -1, 1, 0, 2, 0, 1.975),
-      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, -0.1, 0.65, 1, 0.5),
-      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, 0.1, 1.5, 1.3, 0.25),
-      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, 0.5, 0.75, 0, 0.375),
-      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, 0, tracker.restitution, -0.125, 1.25, -0.125, 0.5),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(1, 1, 1), WALL.ALL /* ^ WALL.BOTTOM */, tracker.restitution, -1, 1, 0, 2, 0, 1.975),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, glMatrix.vec3.fromValues(0.5, 0.5, 0.5), 0, tracker.restitution, -0.1, 0.65, 1, 0.5),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, glMatrix.vec3.fromValues(0.5, 0.5, 0.5), 0, tracker.restitution, 0.1, 1.5, 1.3, 0.25),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, glMatrix.vec3.fromValues(0.5, 0.5, 0.5), 0, tracker.restitution, 0.5, 0.75, 0, 0.375),
+      new Constraint(CONSTRAINT_TYPE.SPHERE, particles, glMatrix.vec3.fromValues(0.5, 0.5, 0.5), 0, tracker.restitution, -0.125, 1.25, -0.125, 0.5),
       ...cloth_c,
     ],
     new Float32Array(initial_conditions)
