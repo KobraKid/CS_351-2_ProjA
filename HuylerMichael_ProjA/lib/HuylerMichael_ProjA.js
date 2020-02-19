@@ -36,7 +36,7 @@ const sprite_locations = {};
 /* Particle Systems */
 var INIT_VEL = 0.15 * 60.0;
 // Vector Field
-const VEC_FIELD_PARTICLE_COUNT = 300;
+const VEC_FIELD_PARTICLE_COUNT = 600;
 const vfield = new PartSys(VEC_FIELD_PARTICLE_COUNT);
 const top_m = [10, 10, 1];
 const top_a = [1, 2, 9];
@@ -616,14 +616,16 @@ function initParticleSystems() {
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // attractor
-      new Force(FORCE_TYPE.FORCE_VORTEX, particles).init_attractor( /* pos */ 6, 7, 0, /* a */ 0, 0, 1, /* τ, L, r */ 2, 10, 6),
+      new Force(FORCE_TYPE.FORCE_VORTEX, particles).init_attractor( /* pos */ 6, 7, 0, /* a */ 0, 0, 1, /* τ, L, r */ 0, 10, 4),
+      new Force(FORCE_TYPE.FORCE_POINT_ATTRACTOR, particles).init_attractor(6, 7, 6, /**/ 0, 0, 0, /**/ 0, 4, 20),
     ],
     [
       new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(1, 1, 1), WALL.ALL, 0.1, 1, 11, 2, 12, 0, 10),
-      new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(0, 1, 0), WALL.ALL, 1, 6, 6.001, 7, 7.001, 0, 10),
+      // new Constraint(CONSTRAINT_TYPE.EXTERNAL_VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(0, 1, 0), WALL.ALL, 1, 6, 6.001, 7, 7.001, 0, 10),
     ],
     new Float32Array(initial_conditions)
   );
+  vfield.force_set[3].disable();
 
   /* Particle System 2: Boids */
   particles = [...Array(BOID_PARTICLE_COUNT - 1).keys()];
@@ -653,7 +655,7 @@ function initParticleSystems() {
     2, 5,
     [
       // boids
-      new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(0.5, 1, (2 * Math.PI) * (1 / 4), (2 * Math.PI) * (1 / 2), 0.8, 0.1, 0.5, 0.1, 0.4),
+      new Force(FORCE_TYPE.FORCE_FLOCK, particles).init_boid(0.5, 1, (2 * Math.PI) * (1 / 4), (2 * Math.PI) * (1 / 2), 0.8, 0.1, 0.5, 0.1, 0.1),
       // drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // wind
@@ -687,7 +689,7 @@ function initParticleSystems() {
       // Color
       0.7, 0, 0, 0.5,
       // Mass
-      1,
+      0.1,
       // Radius
       12,
       // Age
@@ -697,17 +699,17 @@ function initParticleSystems() {
   fire.init(PARTICLE_SYSTEM.REEVES_FIRE,
     3, 5,
     [
-      // TODO gravity
-      // new Force(FORCE_TYPE.FORCE_SIMP_GRAVITY, particles).init_vectored(-tracker.gravity),
+      // Simulate gravity towards the center of the sphere
+      new Force(FORCE_TYPE.FORCE_LINE_ATTRACTOR, particles).init_attractor(-0.5, -1.5, 1, 0, 0, 0),
       // air drag
       new Force(FORCE_TYPE.FORCE_DRAG, particles).init_vectored(tracker.drag),
       // Fountain effect
-      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 0, 0, 1),
-      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 1, 0, 0),
-      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(4, 0, 1, 0),
+      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(2, 0, 0, 1),
+      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(2, 1, 0, 0),
+      new Force(FORCE_TYPE.FORCE_WIND, particles).init_vectored(2, 0, 1, 0),
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(1, 1, 1), WALL.ALL, tracker.restitution, -2, 1, -3, -0.025, 0, 1.975),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(1, 1, 1), WALL.ALL, 0.2, -2, 1, -3, -0.025, 0, 1.975),
       new Constraint(CONSTRAINT_TYPE.SPHERE, particles, glMatrix.vec3.fromValues(1, 0.2, 0.2), 0, 0, -0.5, -1.5, 1, 0.25),
     ],
     new Float32Array(initial_conditions)
@@ -783,7 +785,7 @@ function initParticleSystems() {
       ...cloth_f,
     ],
     [
-      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(1, 1, 1), WALL.ALL /* ^ WALL.BOTTOM */, tracker.restitution, -1, 1, 0, 2, 0, 1.975),
+      new Constraint(CONSTRAINT_TYPE.VOLUME_IMPULSIVE, particles, glMatrix.vec3.fromValues(1, 1, 1), WALL.ALL /* ^ WALL.BOTTOM */ , tracker.restitution, -1, 1, 0, 2, 0, 1.975),
       new Constraint(CONSTRAINT_TYPE.SPHERE, particles, glMatrix.vec3.fromValues(0.5, 0.5, 0.5), 0, tracker.restitution, -0.1, 0.65, 1, 0.5),
       new Constraint(CONSTRAINT_TYPE.SPHERE, particles, glMatrix.vec3.fromValues(0.5, 0.5, 0.5), 0, tracker.restitution, 0.1, 1.5, 1.3, 0.25),
       new Constraint(CONSTRAINT_TYPE.SPHERE, particles, glMatrix.vec3.fromValues(0.5, 0.5, 0.5), 0, tracker.restitution, 0.5, 0.75, 0, 0.375),

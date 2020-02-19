@@ -11,6 +11,7 @@ var keysPressed = {};
 var keyPollingFrequency = 3; // Frames between key polling
 var shouldUpdateKeypress = 0;
 var clothState = false; // true: reset, false: released
+var mouseClicked = false;
 
 /**
  * Performs an action when a key is pressed.
@@ -83,6 +84,8 @@ function keyUp(kev) {
     case "32":
       clothState = !clothState;
       if (clothState) {
+        vfield.force_set[2].enable();
+        vfield.force_set[3].disable();
         var vertical_cloth = [];
         for (var i = 0; i < SPRING_PARTICLE_COUNT; i++) {
           [].push.apply(vertical_cloth, [
@@ -101,6 +104,8 @@ function keyUp(kev) {
             spring.constraint_set[i].enable();
         }
       } else {
+        vfield.force_set[2].disable();
+        vfield.force_set[3].enable();
         for (var i = 0; i < spring.constraint_set.length; i++) {
           if (spring.constraint_set[i].type == CONSTRAINT_TYPE.ABSOLUTE)
             spring.constraint_set[i].disable();
@@ -224,15 +229,21 @@ function updateKeypresses() {
 }
 
 function mouseDown(ev) {
-
+  mouseClicked = true;
 }
 
 function mouseUp(ev) {
-
+  mouseClicked = false;
 }
 
 function mouseMove(ev) {
-
+  if (mouseClicked == false) {
+    vfield.force_set[2].pow = 0;
+    vfield.force_set[3].pow = 0;
+  } else {
+    vfield.force_set[2].pow += 0.005;
+    vfield.force_set[3].pow += 0.005;
+  }
 }
 
 /**

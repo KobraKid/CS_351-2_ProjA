@@ -19,6 +19,7 @@ const FORCE_TYPE = {
   FORCE_LINE_ATTRACTOR: 6,
   FORCE_VORTEX: 7,
   FORCE_UNIFORM_POINT_ATTRACTOR: 8,
+  FORCE_POINT_ATTRACTOR: 9,
 };
 
 // How long the force should stay active
@@ -57,6 +58,9 @@ class Force {
   get particles() {
     return this._p;
   }
+  get pow() {
+    return this._pow;
+  }
 
   set x(new_x) {
     this._x = new_x;
@@ -79,14 +83,17 @@ class Force {
   set magnitude(new_mag) {
     this._magnitude = new_mag;
   }
+  set pow(new_pow) {
+    this._pow = new_pow;
+  }
 
   /**
    * Creates a constant vector force.
    *
    * @param {number} magnitude The magnitude of the force vector.
-   * @param {number} x The x component of the force vector.
-   * @param {number} y The y component of the force vector.
-   * @param {number} z The z component of the force vector.
+   * @param {number=} x The x component of the force vector.
+   * @param {number=} y The y component of the force vector.
+   * @param {number=} z The z component of the force vector.
    */
   init_vectored(magnitude = 1, x = 1, y = 1, z = 1) {
     this._magnitude = magnitude;
@@ -129,6 +136,8 @@ class Force {
    * @param {number} k_a The avoidance hyperparameter.
    * @param {number} k_v The velocity matching hyperparameter.
    * @param {number} k_c The centering hyperparameter.
+   * @param {number} k_oa The obstacle-avoidance hyperparameter.
+   * @param {number} k_gs The goal-seeking hyperparameter.
    */
   init_boid(min_rad, max_rad, binocular_angle, monocular_angle, k_a, k_v, k_c, k_oa, k_gs) {
     this._r1 = min_rad;
@@ -145,13 +154,28 @@ class Force {
 
   /**
    * Initializes an attractor force.
+   *
+   * @param {number} x The x position of the attractor.
+   * @param {number} y The y position of the attractor.
+   * @param {number} z The z position of the attractor.
+   * @param {number} x The x component of the vector in the direction of the attractor.
+   * @param {number} y The y component of the vector in the direction of the attractor.
+   * @param {number} z The z component of the vector in the direction of the attractor.
+   * @param {number=} p The "tightness" of the pull towards the attractor.
+   * @param {number=} L The length of influence of the attractor.
+   * @param {number=} r The radius of influence of the attractor.
    */
-  init_attractor(x, y, z, a_x, a_y, a_z, p, L = 0, r = 0) {
+  init_attractor(x, y, z, a_x, a_y, a_z, p = 2, L = 0, r = 0) {
     this._x_a = glMatrix.vec3.fromValues(x, y, z);
     this._a = glMatrix.vec3.fromValues(a_x, a_y, a_z);
     this._pow = p;
     this._L = L;
     this._r = r;
+    return this;
+  }
+
+  init_set(force_set) {
+    this._set = force_set;
     return this;
   }
 
@@ -362,7 +386,7 @@ class Force {
           if (epsilon <= l_ai && l_ai < this._L) {
             r_ai = glMatrix.vec3.scaleAndAdd(r_ai, x_ai, a, -l_ai);
             r = glMatrix.vec3.len(r_ai);
-            a_ai = glMatrix.vec3.scale(a_ai, r_ai, -9.8 * Math.pow(r, -(this._pow + 1)));
+            a_ai = glMatrix.vec3.scale(a_ai, r_ai, -9.8 * Math.pow(r, (this._pow + 1)));
             s[(this._p[i] * STATE_SIZE) + STATE.F_X] += a_ai[0];
             s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += a_ai[1];
             s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += a_ai[2];
@@ -387,9 +411,9 @@ class Force {
         // closest distance to the vortex axis an affected particle can be
         var epsilon = 0.01;
         // rotational frequency at the edge of the vortex
-        const f_R = 1;
+        const f_R = 2;
         // maximum rotational frequency
-        const f_max = 4;
+        const f_max = Math.pow(10, f_R + 1);
         // rotational frequency of x_i at distance r from the vortex-s axis
         var f_i = 0;
         // angular velocity
@@ -431,7 +455,29 @@ class Force {
           s[(this._p[i] * STATE_SIZE) + STATE.F_X] += dir[0];
           s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += dir[1];
           s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += dir[2];
-          // console.log(glMatrix.vec3.str(dir), glMatrix.vec3.str(this._x_a));
+        }
+        break;
+      case FORCE_TYPE.FORCE_POINT_ATTRACTOR:
+        // Vector from attractor to particle position
+        var dir = glMatrix.vec3.create();
+        // Length of dir
+        var len = 0;
+        for (var i = 0; i < this._p.length; i++) {
+          dir = glMatrix.vec3.sub(dir,
+            this._x_a,
+            glMatrix.vec3.fromValues(
+              s[(this._p[i] * STATE_SIZE) + STATE.P_X],
+              s[(this._p[i] * STATE_SIZE) + STATE.P_Y],
+              s[(this._p[i] * STATE_SIZE) + STATE.P_Z]
+            ));
+          len = glMatrix.vec3.length(dir);
+          if (len > this._L)
+            continue;
+          // Using `this._r` because I'm lazy and don't want to include another parameter in the init function
+          dir = glMatrix.vec3.scale(dir, dir, this._r / Math.pow(len, (this._pow + 1)));
+          s[(this._p[i] * STATE_SIZE) + STATE.F_X] += dir[0];
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Y] += dir[1];
+          s[(this._p[i] * STATE_SIZE) + STATE.F_Z] += dir[2];
         }
         break;
       default:
@@ -446,6 +492,8 @@ class Force {
    * @param {!VBOBox} vbo The VBO to update.
    * @param {number} index The index of this force.
    * @param {boolean} enabled Whether this force should be drawn.
+   * @param {Array<number>} p0 A point on the line representing this force.
+   * @param {Array<number>} p1 A point on the line representing this force.
    */
   draw(vbo, index, enabled, p0, p1) {
     var r = Math.random();

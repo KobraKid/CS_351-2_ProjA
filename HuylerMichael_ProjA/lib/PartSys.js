@@ -182,6 +182,7 @@ class PartSys {
    * @param {VBOBox} constraint_vbo The VBO to render constraints in.
    * @param {Array<Force>} force_set The set of initial forces acting on this particle system.
    * @param {Array<Constraint>} constraint_set The set of initial constraints limiting this particle system.
+   * @param {?Float32Array} initial_conditions The first state of this particle system.
    */
   init(part_sys_type, my_vbo, constraint_vbo, force_set, constraint_set, initial_conditions) {
     this._type = part_sys_type;
@@ -202,7 +203,7 @@ class PartSys {
    * previous state variables too, to prevent any weird effects caused by the
    * retention of a previous (and potentially wildly different) state.
    *
-   * @param {Float32Array} state The state to "blink" to.
+   * @param {?Float32Array} state The state to "blink" to.
    */
   blink(state) {
     if (state != undefined) {
@@ -402,10 +403,10 @@ class PartSys {
   }
 
   /**
-   * Swaps two state vectors.
+   * Swaps state vectors.
    *
-   * @param {?Float32Array} s1 The previous state vector.
-   * @param {?Float32Array} s2 The current state vector.
+   * Moves each state vector we care about back one timestep, so that the
+   * values can be retained for the next timestep.
    */
   swap() {
     this.s0.set(this.s1);

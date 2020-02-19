@@ -65,7 +65,7 @@ function initGui() {
     'Adams-Bashforth': SOLVER.ADAMS_BASHFORTH,
     '(Explicit) Midpoint': SOLVER.MIDPOINT,
     '(Implicit) Midpoint': SOLVER.QUADRATIC_MIDPOINT_INVERSE,
-    'Verlet': SOLVER.VERLET,
+    // 'Verlet': SOLVER.VERLET,
   });
   gui.open();
   document.getElementsByClassName('close-bottom')[0].onclick = function() {

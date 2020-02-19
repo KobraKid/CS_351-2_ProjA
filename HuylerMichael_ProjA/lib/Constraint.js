@@ -60,7 +60,8 @@ class Constraint {
   /**
    * @param {!CONSTRAINT_TYPE} type The type of constraint to represent.
    * @param {Array<number>} affected_particles The list of particles to constrain.
-   * @param {!WALL=} enabled_walls The walls to enable for this constraint.
+   * @param {vec3} color The color of this constraint.
+   * @param {WALL=} enabled_walls The walls to enable for this constraint.
    * @param {...number} bounds The rest of the arguments are all numbers which bound the constraint.
    */
   constructor(type, affected_particles, color, enabled_walls = WALL.NONE, restitution, ...bounds) {
